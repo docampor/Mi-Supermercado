@@ -341,6 +341,14 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(24, 76, 72, 0.11);
 }
 
+.photo-input {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .bottom-nav {
   position: fixed;
   right: 0;
@@ -485,6 +493,7 @@ label {
   place-items: center;
   padding: 6px;
   color: var(--muted);
+  cursor: pointer;
   font-size: 0.72rem;
   font-weight: 800;
   text-align: center;

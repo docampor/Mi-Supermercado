@@ -46,6 +46,7 @@ async function run() {
   const page = await context.newPage();
   const messages = [];
   const testBarcode = "7791234567890";
+  const missingPhotoBarcode = "7790520028655";
   let productRouteHit = false;
 
   page.on("console", (msg) => {
@@ -71,6 +72,39 @@ async function run() {
       })
     });
   });
+  await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v0/product/${missingPhotoBarcode}\\.json.*`), (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        product: {
+          code: missingPhotoBarcode,
+          product_name: "Raid mata moscas",
+          brands: "Raid"
+        }
+      })
+    });
+  });
+  await page.route(new RegExp(`https://world\\.openproductsfacts\\.org/api/v0/product/${missingPhotoBarcode}\\.json.*`), (route) => {
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
+  });
+  await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v3/product/${missingPhotoBarcode}.*`), (route) => {
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
+  });
+  await page.route(new RegExp(`https://api\\.mercadolibre\\.com/sites/MLA/search.*${missingPhotoBarcode}.*`), (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        results: [
+          {
+            title: "Raid Mata Moscas Y Mosquitos 380 Ml",
+            thumbnail: "https://http2.mlstatic.com/D_12345-I.jpg"
+          }
+        ]
+      })
+    });
+  });
 
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Cargar manual" }).click();
@@ -91,12 +125,31 @@ async function run() {
   await page.locator("#quantityInput").fill("2");
   await page.locator("#unitPriceInput").fill("1250");
   await page.locator("#productForm button[type='submit']").click();
-  await page.locator("#productDialog").waitFor({ state: "hidden", timeout: 5000 });
+  try {
+    await page.locator("#productDialog").waitFor({ state: "hidden", timeout: 5000 });
+  } catch (error) {
+    const debug = await page.evaluate(() => ({
+      valid: document.querySelector("#productForm").checkValidity(),
+      name: document.querySelector("#productNameInput").value,
+      quantity: document.querySelector("#quantityInput").value,
+      unitPrice: document.querySelector("#unitPriceInput").value,
+      total: document.querySelector("#productTotalPreview").textContent
+    }));
+    throw new Error(`Dialog did not close after save: ${JSON.stringify(debug)}`);
+  }
 
   await page.getByRole("button", { name: "Lista" }).click();
   await page.getByPlaceholder("Mayonesa, fideos, limpiador...").fill("Mayonesa");
   await page.locator("#listQtyInput").fill("1");
   await page.getByRole("button", { name: "Agregar" }).click();
+
+  await page.getByRole("button", { name: "Compra", exact: true }).click();
+  await page.getByRole("button", { name: "Cargar manual" }).click();
+  await page.locator("#barcodeInput").fill(missingPhotoBarcode);
+  await page.evaluate(() => window.fillProductFromBarcode(true));
+  await page.waitForFunction(() => document.querySelector("#productNameInput").value.includes("Raid"), null, { timeout: 5000 });
+  const fallbackImageSrc = await page.locator(".lookup-image").getAttribute("src");
+  await page.locator("#closeProductButton").click();
 
   await page.getByRole("button", { name: "Stock" }).click();
   await page.locator("#stockNameInput").fill("Arroz");
@@ -112,6 +165,7 @@ async function run() {
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
     lookupImageVisible: Boolean(lookupImageSrc),
+    fallbackImageVisible: Boolean(fallbackImageSrc),
     imageSaved: await page.locator(".product-thumb").count() > 0
   };
 

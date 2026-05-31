@@ -490,6 +490,7 @@ async function fetchExternalProduct(barcode) {
   ];
 
   try {
+    let bestProduct = null;
     for (const url of urls) {
       const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
       if (!response.ok) continue;
@@ -500,7 +501,7 @@ async function fetchExternalProduct(barcode) {
       const name = cleanProductName(product);
       if (!name) continue;
 
-      return {
+      const foundProduct = {
         barcode,
         name,
         lastPrice: "",
@@ -513,13 +514,63 @@ async function fetchExternalProduct(barcode) {
           source: url.includes("openproductsfacts") ? "Open Products Facts" : "Open Food Facts"
         }
       };
+      if (foundProduct.metadata.imageUrl) return foundProduct;
+      bestProduct = bestProduct || foundProduct;
     }
-    return null;
+    const marketplaceProduct = await fetchMercadoLibreProduct(barcode, controller.signal);
+    if (marketplaceProduct?.metadata?.imageUrl) {
+      return bestProduct
+        ? {
+            ...bestProduct,
+            metadata: {
+              ...bestProduct.metadata,
+              imageUrl: marketplaceProduct.metadata.imageUrl,
+              source: `${bestProduct.metadata.source} + Mercado Libre`
+            }
+          }
+        : marketplaceProduct;
+    }
+    return bestProduct || marketplaceProduct;
   } catch {
     return null;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchMercadoLibreProduct(barcode, signal) {
+  try {
+    const url = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(barcode)}&limit=5`;
+    const response = await fetch(url, { signal, cache: "no-store" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const result = data.results?.find((item) => normalize(item.title).includes(normalize(barcode)) || item.title) || data.results?.[0];
+    if (!result?.title) return null;
+
+    return {
+      barcode,
+      name: cleanMarketplaceTitle(result.title),
+      lastPrice: "",
+      metadata: {
+        brand: "",
+        quantityLabel: "",
+        category: "",
+        productType: "marketplace",
+        imageUrl: improveMercadoLibreImage(result.thumbnail || result.secure_thumbnail || ""),
+        source: "Mercado Libre"
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
+function cleanMarketplaceTitle(title) {
+  return String(title || "").replace(/\s+/g, " ").trim();
+}
+
+function improveMercadoLibreImage(url) {
+  return String(url || "").replace("-I.jpg", "-O.jpg").replace("-I.webp", "-O.webp");
 }
 
 function cleanProductName(product) {
@@ -667,7 +718,7 @@ function renderLookupInfo(product) {
 
   els.productLookupInfo.hidden = false;
   els.productLookupInfo.innerHTML = `
-    ${metadata.imageUrl ? `<img class="lookup-image" src="${escapeHtml(metadata.imageUrl)}" alt="${escapeHtml(product.name || "Producto")}">` : `<div class="lookup-image placeholder" aria-hidden="true">Sin foto</div>`}
+    ${metadata.imageUrl ? `<img class="lookup-image" src="${escapeHtml(metadata.imageUrl)}" alt="${escapeHtml(product.name || "Producto")}">` : `<button class="lookup-image placeholder" type="button" id="productPhotoTrigger">Sin foto</button>`}
     <div class="lookup-copy">
       <strong>${escapeHtml(product.name || (hasInfo ? "Producto encontrado" : "Producto no encontrado"))}</strong>
       ${details.length ? `<small>${escapeHtml(details.join(" | "))}</small>` : ""}
@@ -676,6 +727,7 @@ function renderLookupInfo(product) {
       <small>Fuente: ${escapeHtml(source)}</small>
     </div>
   `;
+  $("#productPhotoTrigger")?.addEventListener("click", () => els.productPhotoInput.click());
 }
 
 function addShoppingListItem(event) {
