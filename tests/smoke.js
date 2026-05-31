@@ -54,7 +54,7 @@ async function run() {
     if (["error", "warning"].includes(msg.type())) messages.push(`${msg.type()}: ${text}`);
   });
   page.on("pageerror", (error) => messages.push(`pageerror: ${error.message}`));
-  await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v3/product/${testBarcode}.*`), (route) => {
+  await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v0/product/${testBarcode}\\.json.*`), (route) => {
     productRouteHit = true;
     route.fulfill({
       status: 200,

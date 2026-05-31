@@ -446,7 +446,7 @@ async function fetchExternalProduct(barcode) {
   if (!barcode || !navigator.onLine) return null;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6500);
+  const timeout = setTimeout(() => controller.abort(), 9000);
   const fields = [
     "code",
     "product_name",
@@ -456,33 +456,43 @@ async function fetchExternalProduct(barcode) {
     "quantity",
     "categories",
     "product_type",
-    "image_front_small_url"
+    "image_url",
+    "image_front_url",
+    "image_front_small_url",
+    "selected_images"
   ].join(",");
-  const url = `https://world.openfoodfacts.org/api/v3/product/${encodeURIComponent(barcode)}?product_type=all&cc=ar&lc=es&fields=${encodeURIComponent(fields)}`;
+  const urls = [
+    `https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json?fields=${encodeURIComponent(fields)}`,
+    `https://world.openproductsfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json?fields=${encodeURIComponent(fields)}`,
+    `https://world.openfoodfacts.org/api/v3/product/${encodeURIComponent(barcode)}?product_type=all&cc=ar&lc=es&fields=${encodeURIComponent(fields)}`
+  ];
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
-    const data = await response.json();
-    const product = data.product;
-    if (!product) return null;
+    for (const url of urls) {
+      const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+      if (!response.ok) continue;
+      const data = await response.json();
+      const product = data.product;
+      if (!product) continue;
 
-    const name = cleanProductName(product);
-    if (!name) return null;
+      const name = cleanProductName(product);
+      if (!name) continue;
 
-    return {
-      barcode,
-      name,
-      lastPrice: "",
-      metadata: {
-        brand: firstText(product.brands),
-        quantityLabel: firstText(product.quantity),
-        category: firstText(product.categories),
-        productType: firstText(product.product_type),
-        imageUrl: firstText(product.image_front_small_url),
-        source: "Open Food Facts"
-      }
-    };
+      return {
+        barcode,
+        name,
+        lastPrice: "",
+        metadata: {
+          brand: firstText(product.brands),
+          quantityLabel: firstText(product.quantity),
+          category: firstText(product.categories),
+          productType: firstText(product.product_type),
+          imageUrl: extractProductImage(product),
+          source: url.includes("openproductsfacts") ? "Open Products Facts" : "Open Food Facts"
+        }
+      };
+    }
+    return null;
   } catch {
     return null;
   } finally {
@@ -499,6 +509,18 @@ function cleanProductName(product) {
 
 function firstText(value) {
   return String(value || "").split(",")[0].trim();
+}
+
+function extractProductImage(product) {
+  const direct = firstText(product.image_front_small_url) || firstText(product.image_front_url) || firstText(product.image_url);
+  if (direct) return direct;
+
+  const selected = product.selected_images?.front;
+  const language = selected?.display?.es || selected?.display?.en || selected?.display?.fr || selected?.small?.es || selected?.small?.en || selected?.small?.fr;
+  if (typeof language === "string") return language;
+  if (language?.url) return language.url;
+
+  return "";
 }
 
 async function fillProductFromBarcode(force = false) {
