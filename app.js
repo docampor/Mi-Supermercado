@@ -33,6 +33,7 @@ const els = {
   productForm: $("#productForm"),
   productDialogMode: $("#productDialogMode"),
   productLookupInfo: $("#productLookupInfo"),
+  productPhotoInput: $("#productPhotoInput"),
   barcodeInput: $("#barcodeInput"),
   productNameInput: $("#productNameInput"),
   quantityInput: $("#quantityInput"),
@@ -77,6 +78,7 @@ function bindEvents() {
   $("#cancelProductButton").addEventListener("click", () => els.productDialog.close());
   els.productForm.addEventListener("submit", saveProductEntry);
   $("#lookupProductButton").addEventListener("click", () => fillProductFromBarcode(true));
+  els.productPhotoInput.addEventListener("change", saveProductPhoto);
   els.barcodeInput.addEventListener("change", fillProductFromBarcode);
   els.barcodeInput.addEventListener("blur", fillProductFromBarcode);
   els.barcodeInput.addEventListener("input", queueBarcodeLookup);
@@ -240,7 +242,7 @@ function renderPurchase() {
 function scanForPurchase(listItemId = null) {
   pendingListItemId = listItemId;
   openScanner(async (barcode) => {
-    const product = await resolveBarcodeProduct(barcode);
+    const product = await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
     const listItem = pendingListItemId ? state.shoppingList.find((item) => item.id === pendingListItemId) : null;
     openProductDialog({
       context: "purchase",
@@ -266,6 +268,7 @@ function openProductDialog(options = {}) {
   els.promoPriceInput.value = options.promo?.price || "";
   els.productForm.dataset.editItemId = options.editItemId || "";
   els.productForm.dataset.productMetadata = JSON.stringify(options.productInfo?.metadata || product?.metadata || {});
+  els.productPhotoInput.value = "";
   renderLookupInfo(options.productInfo || product);
   updatePromoVisibility();
   updateTotalPreview();
@@ -425,17 +428,32 @@ function findProductByBarcode(barcode) {
   return state.products.find((product) => product.barcode === barcode);
 }
 
-async function resolveBarcodeProduct(barcode) {
+async function resolveBarcodeProduct(barcode, options = {}) {
   const localProduct = findProductByBarcode(barcode);
-  if (localProduct?.name) return { ...localProduct, source: "local" };
+  const shouldRefreshImage = options.refreshMissingImage && localProduct?.name && !localProduct.metadata?.imageUrl;
+  if (localProduct?.name && !shouldRefreshImage) return { ...localProduct, source: "local" };
 
   toast("Buscando datos del producto...");
   const externalProduct = await fetchExternalProduct(barcode);
   if (externalProduct) {
-    upsertProduct(externalProduct);
+    const mergedProduct = localProduct
+      ? {
+          ...localProduct,
+          ...externalProduct,
+          name: localProduct.name || externalProduct.name,
+          lastPrice: localProduct.lastPrice || externalProduct.lastPrice,
+          metadata: { ...(localProduct.metadata || {}), ...(externalProduct.metadata || {}) }
+        }
+      : externalProduct;
+    upsertProduct(mergedProduct);
     saveState();
-    toast("Producto encontrado.");
-    return { ...externalProduct, source: "online" };
+    toast(mergedProduct.metadata?.imageUrl ? "Producto e imagen encontrados." : "Producto encontrado sin imagen.");
+    return { ...mergedProduct, source: localProduct ? "local" : "online" };
+  }
+
+  if (localProduct?.name) {
+    toast("Producto local encontrado. La base consultada no trajo imagen.");
+    return { ...localProduct, source: "local" };
   }
 
   toast("No encontre datos para ese codigo. Podés cargarlo una vez y queda aprendido.");
@@ -564,12 +582,56 @@ async function fillProductFromBarcode(force = false) {
     metadata: { source: "consulta online" },
     loading: true
   });
-  const product = await resolveBarcodeProduct(barcode);
+  const product = await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
   if (product?.name) {
     els.productNameInput.value = product.name;
     els.productForm.dataset.productMetadata = JSON.stringify(product.metadata || {});
   }
   renderLookupInfo(product);
+}
+
+async function saveProductPhoto() {
+  const file = els.productPhotoInput.files?.[0];
+  if (!file) return;
+
+  try {
+    const imageUrl = await resizeImageFile(file);
+    const metadata = readProductMetadata();
+    metadata.imageUrl = imageUrl;
+    metadata.source = metadata.source || "foto local";
+    els.productForm.dataset.productMetadata = JSON.stringify(metadata);
+    renderLookupInfo({
+      name: els.productNameInput.value.trim() || "Producto con foto",
+      metadata,
+      source: "local"
+    });
+    toast("Foto agregada al producto.");
+  } catch {
+    toast("No pude cargar esa foto. Proba con otra imagen.");
+  }
+}
+
+function resizeImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const maxSize = 480;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.78));
+      };
+      image.onerror = reject;
+      image.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function readProductMetadata() {
@@ -705,7 +767,7 @@ function saveStockFromForm(event) {
 
 function scanForStock() {
   openScanner(async (barcode) => {
-    const product = await resolveBarcodeProduct(barcode);
+    const product = await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
     openProductDialog({
       context: "stock",
       barcode,
