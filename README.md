@@ -10,7 +10,9 @@ Abri `index.html` con el navegador. Los datos se guardan en el mismo dispositivo
 
 El lector usa la camara del celular cuando el navegador lo permite. Por seguridad, muchos navegadores solo habilitan camara en direcciones seguras o en `localhost`.
 
-Si el lector automatico no aparece, la app muestra un campo para ingresar el codigo manualmente. Cuando escaneas o cargas un codigo por primera vez, la app aprende el nombre del producto para las proximas compras.
+Si el lector automatico no aparece, la app muestra un campo para ingresar el codigo manualmente. Cuando escaneas o cargas un codigo por primera vez, la app intenta buscar nombre, marca, presentacion y categoria en Open Food Facts / Open Products Facts. Si no encuentra el producto, podes cargarlo manualmente y queda aprendido para las proximas compras.
+
+El precio no viene en el codigo de barras ni en esa base publica: se carga en cada compra porque depende del supermercado, fecha y promociones.
 
 ## Secciones
 

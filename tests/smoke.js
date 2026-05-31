@@ -40,19 +40,53 @@ async function run() {
     isMobile: true,
     hasTouch: true,
     locale: "es-AR",
-    acceptDownloads: true
+    acceptDownloads: true,
+    serviceWorkers: "block"
   });
   const page = await context.newPage();
   const messages = [];
+  const testBarcode = "7791234567890";
+  let productRouteHit = false;
 
   page.on("console", (msg) => {
-    if (["error", "warning"].includes(msg.type())) messages.push(`${msg.type()}: ${msg.text()}`);
+    const text = msg.text();
+    if (text.includes("Service Worker registration blocked by Playwright")) return;
+    if (["error", "warning"].includes(msg.type())) messages.push(`${msg.type()}: ${text}`);
   });
   page.on("pageerror", (error) => messages.push(`pageerror: ${error.message}`));
+  await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v3/product/${testBarcode}.*`), (route) => {
+    productRouteHit = true;
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        product: {
+          code: testBarcode,
+          product_name: "Salsa lista",
+          brands: "Marca Test",
+          quantity: "500 g",
+          categories: "Salsas",
+          image_front_small_url: "https://static.openfoodfacts.org/images/products/779/123/456/7890/front_es.3.100.jpg"
+        }
+      })
+    });
+  });
 
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Cargar manual" }).click();
-  await page.getByPlaceholder("Nombre del producto").fill("Fideos");
+  await page.locator("#barcodeInput").fill(testBarcode);
+  await page.evaluate(() => window.fillProductFromBarcode(true));
+  try {
+    await page.waitForFunction(() => document.querySelector("#productNameInput").value.includes("Salsa lista"), null, { timeout: 5000 });
+  } catch (error) {
+    const debug = await page.evaluate(() => ({
+      online: navigator.onLine,
+      barcode: document.querySelector("#barcodeInput").value,
+      name: document.querySelector("#productNameInput").value,
+      lookup: document.querySelector("#productLookupInfo").textContent
+    }));
+    throw new Error(`No autocomplete: route=${productRouteHit} debug=${JSON.stringify(debug)}`);
+  }
   await page.locator("#quantityInput").fill("2");
   await page.locator("#unitPriceInput").fill("1250");
   await page.getByRole("button", { name: "Guardar" }).click();
@@ -74,7 +108,8 @@ async function run() {
   const checks = {
     appTitle: bodyText.includes("Control de Stock"),
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
-    purchaseSaved: bodyText.includes("Fideos")
+    purchaseSaved: bodyText.includes("Salsa lista"),
+    imageSaved: await page.locator(".product-thumb").count() > 0
   };
 
   const downloadPromise = page.waitForEvent("download");

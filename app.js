@@ -13,6 +13,7 @@ let scannerCallback = null;
 let scannerStream = null;
 let scannerLoop = 0;
 let deferredInstallPrompt = null;
+let barcodeLookupTimer = 0;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -31,6 +32,7 @@ const els = {
   productDialog: $("#productDialog"),
   productForm: $("#productForm"),
   productDialogMode: $("#productDialogMode"),
+  productLookupInfo: $("#productLookupInfo"),
   barcodeInput: $("#barcodeInput"),
   productNameInput: $("#productNameInput"),
   quantityInput: $("#quantityInput"),
@@ -74,6 +76,10 @@ function bindEvents() {
   $("#closeProductButton").addEventListener("click", () => els.productDialog.close());
   $("#cancelProductButton").addEventListener("click", () => els.productDialog.close());
   els.productForm.addEventListener("submit", saveProductEntry);
+  $("#lookupProductButton").addEventListener("click", () => fillProductFromBarcode(true));
+  els.barcodeInput.addEventListener("change", fillProductFromBarcode);
+  els.barcodeInput.addEventListener("blur", fillProductFromBarcode);
+  els.barcodeInput.addEventListener("input", queueBarcodeLookup);
   els.promoEnabledInput.addEventListener("change", updatePromoVisibility);
   els.stockSearchInput.addEventListener("input", renderStock);
   els.reportMonthInput.addEventListener("change", renderReports);
@@ -210,9 +216,12 @@ function renderPurchase() {
   els.purchaseItems.innerHTML = active.items.map((item) => `
     <article class="item-card">
       <div class="item-main">
-        <div>
-          <strong>${escapeHtml(item.name)}</strong>
-          <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
+        <div class="item-identity">
+          ${productImage(item.metadata?.imageUrl, item.name)}
+          <div>
+            <strong>${escapeHtml(item.name)}</strong>
+            <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
+          </div>
         </div>
         <div class="price">${currency.format(item.total)}</div>
       </div>
@@ -230,15 +239,16 @@ function renderPurchase() {
 
 function scanForPurchase(listItemId = null) {
   pendingListItemId = listItemId;
-  openScanner((barcode) => {
-    const product = findProductByBarcode(barcode);
+  openScanner(async (barcode) => {
+    const product = await resolveBarcodeProduct(barcode);
     const listItem = pendingListItemId ? state.shoppingList.find((item) => item.id === pendingListItemId) : null;
     openProductDialog({
       context: "purchase",
       barcode,
       name: product?.name || listItem?.name || "",
       quantity: parseNumber(listItem?.quantity) || 1,
-      unitPrice: product?.lastPrice || ""
+      unitPrice: product?.lastPrice || "",
+      productInfo: product
     });
   });
 }
@@ -255,12 +265,21 @@ function openProductDialog(options = {}) {
   els.promoQtyInput.value = options.promo?.quantity || "";
   els.promoPriceInput.value = options.promo?.price || "";
   els.productForm.dataset.editItemId = options.editItemId || "";
+  els.productForm.dataset.productMetadata = JSON.stringify(options.productInfo?.metadata || product?.metadata || {});
+  renderLookupInfo(options.productInfo || product);
   updatePromoVisibility();
   updateTotalPreview();
   els.productDialog.showModal();
   setTimeout(() => {
     (els.productNameInput.value ? els.quantityInput : els.productNameInput).focus();
   }, 80);
+}
+
+function queueBarcodeLookup() {
+  clearTimeout(barcodeLookupTimer);
+  const barcode = els.barcodeInput.value.trim();
+  if (barcode.length < 8 || els.productNameInput.value.trim()) return;
+  barcodeLookupTimer = setTimeout(fillProductFromBarcode, 450);
 }
 
 function editPurchaseItem(itemId) {
@@ -295,6 +314,7 @@ function saveProductEntry(event) {
   const quantity = parseNumber(els.quantityInput.value);
   const unitPrice = parseNumber(els.unitPriceInput.value);
   const promo = getPromoInput();
+  const metadata = readProductMetadata();
 
   if (!name || quantity <= 0 || unitPrice < 0) {
     toast("Revisa producto, cantidad y precio.");
@@ -302,7 +322,7 @@ function saveProductEntry(event) {
   }
 
   const total = calculateTotal(quantity, unitPrice, promo);
-  upsertProduct({ barcode, name, lastPrice: unitPrice });
+  upsertProduct({ barcode, name, lastPrice: unitPrice, metadata });
 
   if (activeProductContext === "stock") {
     adjustStock(name, barcode, quantity, true);
@@ -318,7 +338,7 @@ function saveProductEntry(event) {
     const existing = active.items.find((item) => item.id === editItemId);
     if (existing) {
       adjustStock(existing.name, existing.barcode, -Number(existing.quantity || 0), false);
-      Object.assign(existing, { barcode, name, quantity, unitPrice, promo, total, updatedAt: new Date().toISOString() });
+      Object.assign(existing, { barcode, name, quantity, unitPrice, promo, total, metadata, updatedAt: new Date().toISOString() });
       adjustStock(name, barcode, quantity, false);
     }
   } else {
@@ -330,6 +350,7 @@ function saveProductEntry(event) {
       unitPrice,
       promo,
       total,
+      metadata,
       createdAt: new Date().toISOString()
     });
     adjustStock(name, barcode, quantity, false);
@@ -378,13 +399,14 @@ function calculateTotal(quantity, unitPrice, promo) {
   return roundMoney(groups * promo.price + remainder * unitPrice);
 }
 
-function upsertProduct({ barcode, name, lastPrice }) {
+function upsertProduct({ barcode, name, lastPrice, metadata = {} }) {
   const key = barcode || normalize(name);
   const product = state.products.find((entry) => (entry.barcode && entry.barcode === barcode) || normalize(entry.name) === normalize(name));
   if (product) {
     product.barcode = barcode || product.barcode;
     product.name = name;
     product.lastPrice = lastPrice;
+    product.metadata = { ...(product.metadata || {}), ...metadata };
     product.updatedAt = new Date().toISOString();
   } else {
     state.products.push({
@@ -393,6 +415,7 @@ function upsertProduct({ barcode, name, lastPrice }) {
       barcode,
       name,
       lastPrice,
+      metadata,
       updatedAt: new Date().toISOString()
     });
   }
@@ -400,6 +423,127 @@ function upsertProduct({ barcode, name, lastPrice }) {
 
 function findProductByBarcode(barcode) {
   return state.products.find((product) => product.barcode === barcode);
+}
+
+async function resolveBarcodeProduct(barcode) {
+  const localProduct = findProductByBarcode(barcode);
+  if (localProduct?.name) return { ...localProduct, source: "local" };
+
+  toast("Buscando datos del producto...");
+  const externalProduct = await fetchExternalProduct(barcode);
+  if (externalProduct) {
+    upsertProduct(externalProduct);
+    saveState();
+    toast("Producto encontrado.");
+    return { ...externalProduct, source: "online" };
+  }
+
+  toast("No encontre datos para ese codigo. Podés cargarlo una vez y queda aprendido.");
+  return { barcode, name: "", metadata: {}, source: "missing" };
+}
+
+async function fetchExternalProduct(barcode) {
+  if (!barcode || !navigator.onLine) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6500);
+  const fields = [
+    "code",
+    "product_name",
+    "abbreviated_product_name",
+    "generic_name",
+    "brands",
+    "quantity",
+    "categories",
+    "product_type",
+    "image_front_small_url"
+  ].join(",");
+  const url = `https://world.openfoodfacts.org/api/v3/product/${encodeURIComponent(barcode)}?product_type=all&cc=ar&lc=es&fields=${encodeURIComponent(fields)}`;
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const product = data.product;
+    if (!product) return null;
+
+    const name = cleanProductName(product);
+    if (!name) return null;
+
+    return {
+      barcode,
+      name,
+      lastPrice: "",
+      metadata: {
+        brand: firstText(product.brands),
+        quantityLabel: firstText(product.quantity),
+        category: firstText(product.categories),
+        productType: firstText(product.product_type),
+        imageUrl: firstText(product.image_front_small_url),
+        source: "Open Food Facts"
+      }
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function cleanProductName(product) {
+  const baseName = firstText(product.product_name) || firstText(product.abbreviated_product_name) || firstText(product.generic_name);
+  const brand = firstText(product.brands);
+  const quantity = firstText(product.quantity);
+  return [brand, baseName, quantity].filter(Boolean).join(" - ");
+}
+
+function firstText(value) {
+  return String(value || "").split(",")[0].trim();
+}
+
+async function fillProductFromBarcode(force = false) {
+  const barcode = els.barcodeInput.value.trim();
+  if (!barcode || (!force && els.productNameInput.value.trim())) return;
+  const product = await resolveBarcodeProduct(barcode);
+  if (product?.name) {
+    els.productNameInput.value = product.name;
+    els.productForm.dataset.productMetadata = JSON.stringify(product.metadata || {});
+    renderLookupInfo(product);
+  }
+}
+
+function readProductMetadata() {
+  try {
+    return JSON.parse(els.productForm.dataset.productMetadata || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function renderLookupInfo(product) {
+  const metadata = product?.metadata || {};
+  if (!product?.name && !metadata.brand && !metadata.quantityLabel && !metadata.category) {
+    els.productLookupInfo.hidden = true;
+    els.productLookupInfo.innerHTML = "";
+    return;
+  }
+
+  const source = product.source === "local" ? "catalogo local" : metadata.source || "datos guardados";
+  const details = [
+    metadata.brand ? `Marca: ${metadata.brand}` : "",
+    metadata.quantityLabel ? `Presentacion: ${metadata.quantityLabel}` : "",
+    metadata.category ? `Categoria: ${metadata.category}` : ""
+  ].filter(Boolean);
+
+  els.productLookupInfo.hidden = false;
+  els.productLookupInfo.innerHTML = `
+    ${metadata.imageUrl ? `<img class="lookup-image" src="${escapeHtml(metadata.imageUrl)}" alt="${escapeHtml(product.name || "Producto")}">` : ""}
+    <div class="lookup-copy">
+      <strong>${escapeHtml(product.name || "Producto encontrado")}</strong>
+      ${details.length ? `<small>${escapeHtml(details.join(" | "))}</small>` : ""}
+      <small>Fuente: ${escapeHtml(source)}</small>
+    </div>
+  `;
 }
 
 function addShoppingListItem(event) {
@@ -490,14 +634,15 @@ function saveStockFromForm(event) {
 }
 
 function scanForStock() {
-  openScanner((barcode) => {
-    const product = findProductByBarcode(barcode);
+  openScanner(async (barcode) => {
+    const product = await resolveBarcodeProduct(barcode);
     openProductDialog({
       context: "stock",
       barcode,
       name: product?.name || "",
       quantity: 1,
-      unitPrice: product?.lastPrice || 0
+      unitPrice: product?.lastPrice || 0,
+      productInfo: product
     });
   });
 }
@@ -505,10 +650,12 @@ function scanForStock() {
 function adjustStock(name, barcode, quantity, replace) {
   const normalized = normalize(name);
   const item = state.stock.find((entry) => (barcode && entry.barcode === barcode) || normalize(entry.name) === normalized);
+  const product = barcode ? findProductByBarcode(barcode) : state.products.find((entry) => normalize(entry.name) === normalized);
   if (item) {
     item.barcode = barcode || item.barcode;
     item.name = name;
     item.quantity = replace ? quantity : Math.max(0, Number(item.quantity || 0) + quantity);
+    item.metadata = { ...(item.metadata || {}), ...(product?.metadata || {}) };
     item.updatedAt = new Date().toISOString();
   } else {
     state.stock.push({
@@ -516,6 +663,7 @@ function adjustStock(name, barcode, quantity, replace) {
       barcode,
       name,
       quantity: Math.max(0, quantity),
+      metadata: product?.metadata || {},
       updatedAt: new Date().toISOString()
     });
   }
@@ -535,9 +683,12 @@ function renderStock() {
   els.stockList.innerHTML = rows.map((item) => `
     <article class="item-card">
       <div class="item-main">
-        <div>
-          <strong>${escapeHtml(item.name)}</strong>
-          <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
+        <div class="item-identity">
+          ${productImage(item.metadata?.imageUrl, item.name)}
+          <div>
+            <strong>${escapeHtml(item.name)}</strong>
+            <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
+          </div>
         </div>
         <div class="price">${formatNumber(item.quantity)}</div>
       </div>
@@ -693,6 +844,9 @@ function exportExcel() {
     fecha: formatDateTime(purchase.startedAt),
     codigo: item.barcode || "",
     producto: item.name,
+    marca: item.metadata?.brand || "",
+    presentacion: item.metadata?.quantityLabel || "",
+    categoria: item.metadata?.category || "",
     cantidad: item.quantity,
     precioUnitario: item.unitPrice,
     promocion: item.promo?.enabled ? `${item.promo.quantity} por ${item.promo.price}` : "",
@@ -703,7 +857,7 @@ function exportExcel() {
     <html>
       <head><meta charset="utf-8"></head>
       <body>
-        ${tableHtml("Compras", rows, ["fecha", "codigo", "producto", "cantidad", "precioUnitario", "promocion", "total"])}
+        ${tableHtml("Compras", rows, ["fecha", "codigo", "producto", "marca", "presentacion", "categoria", "cantidad", "precioUnitario", "promocion", "total"])}
         ${tableHtml("Stock", state.stock, ["barcode", "name", "quantity", "updatedAt"])}
         ${tableHtml("Lista", state.shoppingList, ["name", "quantity", "createdAt"])}
       </body>
@@ -750,6 +904,11 @@ function metric(value, label) {
 
 function emptyState(text) {
   return `<div class="empty-state">${escapeHtml(text)}</div>`;
+}
+
+function productImage(url, name) {
+  if (!url) return "";
+  return `<img class="product-thumb" src="${escapeHtml(url)}" alt="${escapeHtml(name)}" loading="lazy">`;
 }
 
 function toast(message) {
@@ -815,3 +974,4 @@ window.editListItem = editListItem;
 window.deleteListItem = deleteListItem;
 window.changeStock = changeStock;
 window.deleteStock = deleteStock;
+window.fillProductFromBarcode = fillProductFromBarcode;

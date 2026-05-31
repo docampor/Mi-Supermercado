@@ -153,8 +153,12 @@
 
         <label>
           Codigo de barras
-          <input id="barcodeInput" autocomplete="off" inputmode="numeric" placeholder="Sin codigo">
+          <div class="barcode-row">
+            <input id="barcodeInput" autocomplete="off" inputmode="numeric" placeholder="Sin codigo">
+            <button class="secondary small" type="button" id="lookupProductButton">Buscar datos</button>
+          </div>
         </label>
+        <div class="lookup-info" id="productLookupInfo" hidden></div>
         <label>
           Producto
           <input id="productNameInput" autocomplete="off" required placeholder="Nombre del producto">

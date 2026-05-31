@@ -160,6 +160,18 @@ h3 {
   grid-template-columns: 1fr;
 }
 
+.barcode-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.barcode-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 .primary,
 .secondary,
 .danger,
@@ -251,6 +263,23 @@ h3 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
+}
+
+.item-identity {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.product-thumb {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .item-main strong {
@@ -410,6 +439,43 @@ label {
 .promo-box {
   padding: 12px;
   background: #f5eee0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.lookup-info {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: #edf4f1;
+  border: 1px solid rgba(24, 76, 72, 0.16);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.lookup-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.lookup-info strong {
+  color: var(--primary);
+}
+
+.lookup-info small {
+  color: var(--muted);
+}
+
+.lookup-image {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
