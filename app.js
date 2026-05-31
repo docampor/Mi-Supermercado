@@ -57,8 +57,167 @@ const ARGENTINA_PRODUCT_CATALOG = {
         checkedAt: "2026-05-31"
       }
     }
+  },
+  "7793253003807": {
+    barcode: "7793253003807",
+    name: "Ayudin - Lavandina en Gel Citrica 700 ml",
+    lastPrice: "",
+    metadata: {
+      brand: "Ayudin",
+      quantityLabel: "700 ml",
+      category: "Limpieza / Lavandina en gel",
+      productType: "catalogo argentino",
+      imageUrl: "https://images.pricely.ar/images/1/7793253003807.webp",
+      source: "Catalogo argentino + Pricely",
+      priceReference: {
+        bestPrice: 2161.25,
+        averagePrice: 3737.86,
+        dealPrice: 2325.01,
+        source: "Pricely",
+        url: "https://pricely.ar/product/7793253003807",
+        checkedAt: "2026-05-31"
+      }
+    }
+  },
+  "7791130963633": {
+    barcode: "7791130963633",
+    name: "Procenex - Limpia Pisos Frescura de Gardenia 1.8 l",
+    lastPrice: "",
+    metadata: {
+      brand: "Procenex",
+      quantityLabel: "1.8 l",
+      category: "Limpieza / Limpia pisos",
+      productType: "catalogo argentino",
+      imageUrl: "https://images.pricely.ar/images/1/7791130963633.webp",
+      source: "Catalogo argentino + Pricely",
+      priceReference: {
+        bestPrice: 3150,
+        averagePrice: 4321.66,
+        dealPrice: 3150,
+        source: "Pricely",
+        url: "https://pricely.ar/product/7791130963633",
+        checkedAt: "2026-05-31"
+      }
+    }
   }
 };
+
+const AYUDIN_BRAND_PRODUCTS = {
+  "7793253000400": "Ayudin Maxima Pureza 1 l",
+  "7790132098459": "Ayudin Lavandina Original 1 l",
+  "7793253006709": "Ayudin Lavandina Original 2 l",
+  "7793253006716": "Ayudin Lavandina Original 4 l",
+  "7793253003715": "Ayudin Lavanda Triple Poder 1 l",
+  "7793253003722": "Ayudin Lavanda Triple Poder 2 l",
+  "7793253003739": "Ayudin Lavanda Triple Poder 4 l",
+  "7793253003746": "Ayudin Pureza del Glaciar Triple Poder 1 l",
+  "7793253003753": "Ayudin Pureza del Glaciar Triple Poder 2 l",
+  "7793253003760": "Ayudin Pureza del Glaciar Triple Poder 4 l",
+  "7793253003777": "Ayudin Antisplash 1 l",
+  "7793253003784": "Ayudin Antisplash 2 l",
+  "7793253003791": "Ayudin Lavandina Gel Expert Original 700 ml",
+  "7793253003807": "Ayudin Lavandina Gel Expert Citrica 700 ml",
+  "7793253003814": "Ayudin Lavandina Gel Expert Floral 700 ml",
+  "7793253003821": "Ayudin Lavandina Gel Expert Menta 700 ml",
+  "7793253003838": "Ayudin Lavandina Gel Expert Lavanda 700 ml",
+  "7793253005856": "Ayudin Lavandina en Gel Original 500 ml",
+  "7793253005863": "Ayudin Lavandina en Gel Citrica 500 ml",
+  "7793253003869": "Ayudin Lavandina en Gel Original 1.5 l",
+  "7793253003876": "Ayudin Lavandina en Gel Citrica 1.5 l",
+  "7793253004699": "Ayudin Limpiador Desinfectante Lavanda 900 ml",
+  "7793253004729": "Ayudin Limpiador Desinfectante Marina 900 ml",
+  "7793253004743": "Ayudin Limpiador Desinfectante Floral 900 ml",
+  "7793253004705": "Ayudin Limpiador Desinfectante Lavanda 1.8 l",
+  "7793253004736": "Ayudin Limpiador Desinfectante Marina 1.8 l",
+  "7793253004750": "Ayudin Limpiador Desinfectante Floral 1.8 l",
+  "7793253005054": "Ayudin Aerosol Desinfectante Expert Original 332 cc",
+  "7793253005061": "Ayudin Aerosol Desinfectante Expert Frescura Matinal 332 cc",
+  "7793253005078": "Ayudin Aerosol Desinfectante Expert Bebe 332 cc",
+  "7793253005337": "Ayudin Aerosol Desinfectante Expert Original 482 cc"
+};
+
+const PROCENEX_BRAND_PRODUCTS = {
+  "7791130963633": "Procenex Limpia Pisos Frescura de Gardenia 1.8 l",
+  "7791130963343": "Procenex Limpiador Liquido Brisa Floral 900 ml"
+};
+
+const ARGENTINA_BRAND_DATABASE = [
+  {
+    company: "Grupo Arcor",
+    category: "Alimentos",
+    brands: ["Arcor", "BC", "La Campagnola", "Salsati", "Presto Pronta", "Prestopronta", "Nereida", "Godet", "Bagley", "Chocolinas", "Rumba", "Sonrisas", "Criollitas", "Opera", "Cereal Mix", "Mogul", "Bon o Bon", "Cofler", "Aguila", "Tofi", "Rocklets", "Menthoplus", "Topline"]
+  },
+  {
+    company: "Nestle",
+    category: "Alimentos",
+    brands: ["Nestle", "Nescafe", "Dolca", "Nesquik", "KitKat", "Kit Kat", "Crunch", "Baton", "Suflair", "Garoto", "Nido", "Svelty", "La Lechera", "Nestum", "Maggi", "Fitness", "Frigor", "Eco de los Andes", "Glaciar", "Nespresso", "Purina"]
+  },
+  {
+    company: "Unilever",
+    category: "Alimentos y cuidado personal",
+    brands: ["Hellmann's", "Hellmanns", "Knorr", "Maizena", "Savora", "Magnum", "Cornetto", "Dove", "Axe", "Rexona", "Lux", "Sedal", "Suave", "Clear", "Tresemme", "Cif", "Vim", "Comfort", "Ala", "Skip", "Drive"]
+  },
+  {
+    company: "Molinos Rio de la Plata",
+    category: "Alimentos",
+    brands: ["Matarazzo", "Lucchetti", "Granja del Sol", "Gallo", "Gallo Snacks", "Cocinero", "Exquisita", "La Saltena", "La Salteña", "Don Vicente", "Favorita", "Lira", "Nobleza Gaucha", "Canale", "Terrabusi"]
+  },
+  {
+    company: "Mondelez",
+    category: "Alimentos",
+    brands: ["Oreo", "Pepitos", "Melba", "Variedad", "Terrabusi", "Tita", "Rhodesia", "Milka", "Shot", "Cadbury", "Beldent", "Halls", "Tang", "Clight", "Royal"]
+  },
+  {
+    company: "Mastellone Hnos.",
+    category: "Lacteos",
+    brands: ["La Serenisima", "La Serenísima", "Ser", "Cindor", "Finlandia", "Casancrem", "Armonia", "Armonía", "Quesabores"]
+  },
+  {
+    company: "Danone",
+    category: "Lacteos y bebidas",
+    brands: ["Danone", "Actimel", "Activia", "Danonino", "Ser", "Villavicencio", "Villa del Sur", "Levite"]
+  },
+  {
+    company: "PepsiCo",
+    category: "Bebidas y snacks",
+    brands: ["Pepsi", "Seven Up", "7Up", "Mirinda", "Gatorade", "Paso de los Toros", "Toddy", "Quaker", "Lay's", "Lays", "Doritos", "Cheetos", "Twistos", "Pehuamar"]
+  },
+  {
+    company: "Coca-Cola",
+    category: "Bebidas",
+    brands: ["Coca Cola", "Coca-Cola", "Sprite", "Fanta", "Schweppes", "Cepita", "Aquarius", "Powerade", "Bonaqua"]
+  },
+  {
+    company: "Grupo Ayudin",
+    category: "Limpieza",
+    brands: ["Ayudin", "Ayudín", "Poett", "Trenet", "Selton", "Arco Iris"]
+  },
+  {
+    company: "Procenex",
+    category: "Limpieza",
+    brands: ["Procenex"]
+  },
+  {
+    company: "SC Johnson",
+    category: "Limpieza",
+    brands: ["Raid", "Glade", "Mr Musculo", "Mr. Musculo", "Fuyi", "Off", "Ziploc", "Blem", "Echo"]
+  },
+  {
+    company: "Procter & Gamble",
+    category: "Limpieza y cuidado personal",
+    brands: ["Magistral", "Ariel", "Ace", "Downy", "Pantene", "Head & Shoulders", "H&S", "Gillette", "Oral-B", "Always", "Pampers"]
+  },
+  {
+    company: "Reckitt",
+    category: "Limpieza y cuidado personal",
+    brands: ["Vanish", "Lysoform", "Harpic", "Woolite", "Dettol", "Finish", "Air Wick", "Veet", "Strepsils"]
+  },
+  {
+    company: "Alicorp",
+    category: "Alimentos y cuidado personal",
+    brands: ["AlaCena", "Cocinero", "Plusbelle", "Zorro", "Okebon", "Fanacoa"]
+  }
+];
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -105,6 +264,7 @@ function init() {
 }
 
 function bindEvents() {
+  document.addEventListener("error", handleImageError, true);
   document.querySelectorAll(".nav-button").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.view));
   });
@@ -148,6 +308,26 @@ function bindEvents() {
     deferredInstallPrompt = null;
     els.installButton.hidden = true;
   });
+}
+
+function handleImageError(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLImageElement)) return;
+
+  if (target.classList.contains("lookup-image")) {
+    const button = document.createElement("button");
+    button.className = "lookup-image placeholder";
+    button.type = "button";
+    button.id = "productPhotoTrigger";
+    button.textContent = "Sin foto";
+    button.addEventListener("click", () => els.productPhotoInput.click());
+    target.replaceWith(button);
+    return;
+  }
+
+  if (target.classList.contains("product-thumb")) {
+    target.remove();
+  }
 }
 
 function loadState() {
@@ -449,6 +629,7 @@ function calculateTotal(quantity, unitPrice, promo) {
 
 function upsertProduct({ barcode, name, lastPrice, metadata = {} }) {
   const key = barcode || normalize(name);
+  metadata = enrichMetadataWithBrand(name, metadata);
   const product = state.products.find((entry) => (entry.barcode && entry.barcode === barcode) || normalize(entry.name) === normalize(name));
   if (product) {
     product.barcode = barcode || product.barcode;
@@ -486,7 +667,9 @@ async function resolveBarcodeProduct(barcode, options = {}) {
   if (localProduct?.name && !shouldRefreshImage) return { ...localProduct, source: "local" };
 
   toast("Buscando datos del producto...");
-  const externalProduct = await fetchExternalProduct(barcode, { product: localProduct });
+  const typedHint = els.productNameInput?.value?.trim();
+  const hintProduct = typedHint ? { barcode, name: typedHint, metadata: enrichMetadataWithBrand(typedHint, {}) } : null;
+  const externalProduct = await fetchExternalProduct(barcode, { product: mergeProductData(localProduct, hintProduct) });
   if (externalProduct) {
     const mergedProduct = mergeProductData(localProduct, externalProduct);
     upsertProduct(mergedProduct);
@@ -502,6 +685,15 @@ async function resolveBarcodeProduct(barcode, options = {}) {
   }
 
   if (catalogProduct) return { ...catalogProduct, source: "catalog" };
+  if (hintProduct?.name) {
+    return {
+      barcode,
+      name: hintProduct.name,
+      lastPrice: "",
+      metadata: enrichMetadataWithBrand(hintProduct.name, hintProduct.metadata || {}),
+      source: "brand-database"
+    };
+  }
 
   toast("No encontre datos para ese codigo. Podés cargarlo una vez y queda aprendido.");
   return { barcode, name: "", metadata: {}, source: "missing" };
@@ -509,22 +701,101 @@ async function resolveBarcodeProduct(barcode, options = {}) {
 
 function findArgentinaCatalogProduct(barcode) {
   const product = ARGENTINA_PRODUCT_CATALOG[barcode];
-  return product ? JSON.parse(JSON.stringify(product)) : null;
+  if (product) return JSON.parse(JSON.stringify(product));
+  return findArgentinaBrandSourceProduct(barcode);
+}
+
+function findArgentinaBrandSourceProduct(barcode) {
+  const ayudinName = AYUDIN_BRAND_PRODUCTS[barcode];
+  if (ayudinName || isAyudinFamilyCode(barcode)) {
+    return buildBrandSourceProduct({
+      barcode,
+      name: ayudinName || "Grupo Ayudin - Producto de limpieza",
+      brand: detectAyudinBrand(ayudinName || barcode),
+      category: detectCleaningCategory(ayudinName || "Producto de limpieza"),
+      source: ayudinName ? "Fuente marca: Grupo Ayudin" : "Fuente marca: Grupo Ayudin por familia EAN"
+    });
+  }
+
+  const procenexName = PROCENEX_BRAND_PRODUCTS[barcode];
+  if (procenexName || isProcenexFamilyCode(barcode)) {
+    return buildBrandSourceProduct({
+      barcode,
+      name: procenexName || "Procenex - Producto de limpieza",
+      brand: "Procenex",
+      category: detectCleaningCategory(procenexName || "Producto de limpieza"),
+      source: procenexName ? "Fuente marca: Procenex" : "Fuente marca: Procenex por familia EAN"
+    });
+  }
+
+  return null;
+}
+
+function buildBrandSourceProduct({ barcode, name, brand, category, source }) {
+  return {
+    barcode,
+    name,
+    lastPrice: "",
+    metadata: {
+      brand,
+      quantityLabel: extractQuantityLabel(name),
+      category,
+      productType: "fuente de marca argentina",
+      imageUrl: `https://images.pricely.ar/images/1/${barcode}.webp`,
+      source,
+      priceReference: {
+        source: "Pricely",
+        url: `https://pricely.ar/product/${barcode}`
+      }
+    }
+  };
+}
+
+function isAyudinFamilyCode(barcode) {
+  return /^77932530/.test(barcode) || /^779013209/.test(barcode);
+}
+
+function isProcenexFamilyCode(barcode) {
+  return /^779113096/.test(barcode);
+}
+
+function detectAyudinBrand(name) {
+  const normalized = normalize(name);
+  if (normalized.includes("poett")) return "Poett";
+  if (normalized.includes("selton")) return "Selton";
+  if (normalized.includes("trenet")) return "Trenet";
+  if (normalized.includes("arco iris")) return "Arco Iris";
+  return "Ayudin";
+}
+
+function detectCleaningCategory(name) {
+  const normalized = normalize(name);
+  if (normalized.includes("lavandina")) return "Limpieza / Lavandina";
+  if (normalized.includes("desinfectante")) return "Limpieza / Desinfectante";
+  if (normalized.includes("limpiador") || normalized.includes("procenex")) return "Limpieza / Limpiador";
+  if (normalized.includes("aerosol") || normalized.includes("repelente") || normalized.includes("selton")) return "Limpieza / Insecticida";
+  return "Limpieza";
+}
+
+function extractQuantityLabel(name) {
+  const match = String(name || "").match(/\b\d+(?:[.,]\d+)?\s?(ml|cc|l|lt|lts|g|kg)\b/i);
+  return match ? match[0].replace("lt", "l").replace("lts", "l") : "";
 }
 
 function mergeProductData(baseProduct, newProduct) {
   if (!baseProduct) return newProduct;
   if (!newProduct) return baseProduct;
+  const mergedName = chooseBetterName(baseProduct.name, newProduct.name);
   return {
     ...baseProduct,
     barcode: baseProduct.barcode || newProduct.barcode,
-    name: chooseBetterName(baseProduct.name, newProduct.name),
+    name: mergedName,
     lastPrice: baseProduct.lastPrice || newProduct.lastPrice,
-    metadata: {
+    metadata: enrichMetadataWithBrand(mergedName, {
       ...(baseProduct.metadata || {}),
       ...(newProduct.metadata || {}),
       imageUrl: baseProduct.metadata?.imageUrl || newProduct.metadata?.imageUrl || ""
-    }
+    })
   };
 }
 
@@ -532,6 +803,57 @@ function chooseBetterName(currentName, candidateName) {
   if (!currentName) return candidateName || "";
   if (!candidateName) return currentName;
   return candidateName.length > currentName.length ? candidateName : currentName;
+}
+
+function findBrandInfo(text) {
+  const normalizedText = ` ${normalize(text)} `;
+  if (!normalizedText.trim()) return null;
+
+  for (const entry of ARGENTINA_BRAND_DATABASE) {
+    for (const brand of entry.brands) {
+      const normalizedBrand = normalize(brand);
+      if (!normalizedBrand) continue;
+      const brandPattern = new RegExp(`(^|\\s)${escapeRegExp(normalizedBrand).replaceAll("\\ ", "\\s+")}(\\s|$)`);
+      if (brandPattern.test(normalizedText)) {
+        return {
+          company: entry.company,
+          brand: canonicalBrandName(brand),
+          category: entry.category
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function enrichMetadataWithBrand(name, metadata = {}) {
+  const brandInfo = findBrandInfo([metadata.brand, name].filter(Boolean).join(" "));
+  if (!brandInfo) return metadata;
+  return {
+    ...metadata,
+    brand: metadata.brand || brandInfo.brand,
+    company: metadata.company || brandInfo.company,
+    category: metadata.category || brandInfo.category,
+    brandSource: metadata.brandSource || "Base de marcas Argentina"
+  };
+}
+
+function canonicalBrandName(brand) {
+  const normalized = normalize(brand);
+  const aliases = {
+    hellmanns: "Hellmann's",
+    "la serenisma": "La Serenisima",
+    "la serenisima": "La Serenisima",
+    ayudin: "Ayudin",
+    "mr musculo": "Mr Musculo",
+    "h s": "Head & Shoulders",
+    lays: "Lay's"
+  };
+  return aliases[normalized] || brand;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function fetchExternalProduct(barcode, hints = {}) {
@@ -575,12 +897,13 @@ async function fetchExternalProduct(barcode, hints = {}) {
 
       const name = cleanProductName(product);
       if (!name) continue;
+      if (hints.product?.name && scoreMarketplaceTitle(searchTokens(hints.product.name), name) < 0.35) continue;
 
       const foundProduct = {
         barcode,
         name,
         lastPrice: "",
-        metadata: {
+        metadata: enrichMetadataWithBrand(name, {
           brand: firstText(product.brands),
           quantityLabel: firstText(product.quantity),
           category: firstText(product.categories),
@@ -588,7 +911,7 @@ async function fetchExternalProduct(barcode, hints = {}) {
           imageUrl: extractProductImage(product),
           source: url.includes("openproductsfacts") ? "Open Products Facts" : "Open Food Facts",
           priceReference
-        }
+        })
       };
       if (foundProduct.metadata.imageUrl) return foundProduct;
       bestProduct = bestProduct || foundProduct;
@@ -598,12 +921,12 @@ async function fetchExternalProduct(barcode, hints = {}) {
       return bestProduct
         ? {
             ...bestProduct,
-            metadata: {
-              ...bestProduct.metadata,
-              imageUrl: marketplaceProduct.metadata.imageUrl,
-              source: `${bestProduct.metadata.source} + Mercado Libre`,
-              priceReference: bestProduct.metadata.priceReference || priceReference
-            }
+          metadata: enrichMetadataWithBrand(bestProduct.name, {
+            ...bestProduct.metadata,
+            imageUrl: marketplaceProduct.metadata.imageUrl,
+            source: `${bestProduct.metadata.source} + Mercado Libre`,
+            priceReference: bestProduct.metadata.priceReference || priceReference
+          })
           }
         : marketplaceProduct;
     }
@@ -664,14 +987,14 @@ async function fetchMercadoLibreProduct(barcode, signal, hintProduct = null) {
         barcode,
         name: cleanMarketplaceTitle(result.title),
         lastPrice: "",
-        metadata: {
+        metadata: enrichMetadataWithBrand(result.title, {
           brand: hintProduct?.metadata?.brand || "",
           quantityLabel: hintProduct?.metadata?.quantityLabel || "",
           category: hintProduct?.metadata?.category || "",
           productType: "marketplace",
           imageUrl: improveMercadoLibreImage(result.thumbnail || result.secure_thumbnail || ""),
           source: `Mercado Libre (${query})`
-        }
+        })
       };
     }
     return null;
@@ -682,11 +1005,16 @@ async function fetchMercadoLibreProduct(barcode, signal, hintProduct = null) {
 
 function buildMercadoLibreQueries(barcode, hintProduct) {
   const brand = hintProduct?.metadata?.brand || "";
+  const company = hintProduct?.metadata?.company || "";
   const name = hintProduct?.name || "";
+  const brandInfo = findBrandInfo(`${brand} ${name}`);
+  const detectedBrand = brandInfo?.brand || brand;
   return uniqueValues([
-    simplifyProductSearch(`${brand} ${name}`),
+    simplifyProductSearch(`${detectedBrand} ${name}`),
     simplifyProductSearch(name),
     simplifyProductSearch(removePackaging(name)),
+    simplifyProductSearch(`${detectedBrand} ${removePackaging(name)}`),
+    simplifyProductSearch(`${company} ${removePackaging(name)}`),
     barcode
   ]).filter((query) => query && query.length >= 4);
 }
@@ -896,6 +1224,7 @@ function renderLookupInfo(product) {
         ? "sin resultado"
         : metadata.source || "datos guardados";
   const details = [
+    metadata.company ? `Empresa: ${metadata.company}` : "",
     metadata.brand ? `Marca: ${metadata.brand}` : "",
     metadata.quantityLabel ? `Presentacion: ${metadata.quantityLabel}` : "",
     metadata.category ? `Categoria: ${metadata.category}` : ""

@@ -48,6 +48,8 @@ async function run() {
   const testBarcode = "7791234567890";
   const missingPhotoBarcode = "7790520028655";
   const catalogBarcode = "7790990003039";
+  const newCatalogBarcodes = ["7793253003807", "7791130963633"];
+  const brandSourceBarcodes = ["7793253003814", "7791130963343"];
   let productRouteHit = false;
 
   page.on("console", (msg) => {
@@ -56,6 +58,13 @@ async function run() {
     if (["error", "warning"].includes(msg.type())) messages.push(`${msg.type()}: ${text}`);
   });
   page.on("pageerror", (error) => messages.push(`pageerror: ${error.message}`));
+  await page.route(/https:\/\/(static\.openfoodfacts\.org|http2\.mlstatic\.com|images\.pricely\.ar)\/.*/, (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64")
+    });
+  });
   await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v0/product/${testBarcode}\\.json.*`), (route) => {
     productRouteHit = true;
     route.fulfill({
@@ -111,6 +120,15 @@ async function run() {
       return;
     }
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ results: [] }) });
+  });
+  await page.route(/https:\/\/world\.openfoodfacts\.org\/api\/v0\/product\/9999999999999\.json.*/, (route) => {
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
+  });
+  await page.route(/https:\/\/world\.openproductsfacts\.org\/api\/v0\/product\/9999999999999\.json.*/, (route) => {
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
+  });
+  await page.route(/https:\/\/world\.openfoodfacts\.org\/api\/v3\/product\/9999999999999.*/, (route) => {
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
   });
 
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
@@ -189,6 +207,46 @@ async function run() {
   const catalogPriceText = await page.locator(".price-reference").innerText();
   await page.locator("#closeProductButton").click();
 
+  const newCatalogResults = [];
+  for (const barcode of newCatalogBarcodes) {
+    await page.getByRole("button", { name: "Cargar manual" }).click();
+    await page.locator("#barcodeInput").fill(barcode);
+    await page.evaluate(() => window.fillProductFromBarcode(true));
+    await page.waitForFunction(() => document.querySelector("#productNameInput").value.trim().length > 0, null, { timeout: 5000 });
+    newCatalogResults.push({
+      barcode,
+      image: Boolean(await page.locator(".lookup-image").getAttribute("src")),
+      price: (await page.locator(".price-reference").innerText()).includes("$")
+    });
+    await page.locator("#closeProductButton").click();
+  }
+
+  const brandSourceResults = [];
+  for (const barcode of brandSourceBarcodes) {
+    await page.getByRole("button", { name: "Cargar manual" }).click();
+    await page.locator("#barcodeInput").fill(barcode);
+    await page.evaluate(() => window.fillProductFromBarcode(true));
+    await page.waitForFunction(() => document.querySelector("#productNameInput").value.trim().length > 0, null, { timeout: 5000 });
+    const sourceText = await page.locator("#productLookupInfo").innerText();
+    brandSourceResults.push({
+      barcode,
+      found: !sourceText.includes("Producto no encontrado") && sourceText.includes("Fuente marca")
+    });
+    await page.locator("#closeProductButton").click();
+  }
+
+  await page.getByRole("button", { name: "Cargar manual" }).click();
+  await page.locator("#productNameInput").fill("fideos matarazzo");
+  await page.locator("#barcodeInput").fill("9999999999999");
+  await page.evaluate(() => window.fillProductFromBarcode(true));
+  try {
+    await page.waitForFunction(() => document.querySelector("#productLookupInfo").textContent.includes("Molinos"), null, { timeout: 5000 });
+  } catch (error) {
+    throw new Error(await page.locator("#productLookupInfo").innerText());
+  }
+  const brandDatabaseText = await page.locator("#productLookupInfo").innerText();
+  await page.locator("#closeProductButton").click();
+
   await page.getByRole("button", { name: "Stock" }).click();
   await page.locator("#stockNameInput").fill("Arroz");
   await page.locator("#stockQtyInput").fill("3");
@@ -206,6 +264,9 @@ async function run() {
     fallbackImageVisible: Boolean(fallbackImageSrc),
     catalogImageVisible: Boolean(catalogImageSrc),
     priceReferenceVisible: catalogPriceText.includes("Mejor precio") && catalogPriceText.includes("$"),
+    newCatalogProductsVisible: newCatalogResults.every((item) => item.image && item.price),
+    brandSourcesVisible: brandSourceResults.every((item) => item.found),
+    brandDatabaseVisible: brandDatabaseText.includes("Matarazzo") && brandDatabaseText.includes("Molinos"),
     imageSaved: await page.locator(".product-thumb").count() > 0
   };
 
