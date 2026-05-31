@@ -470,6 +470,27 @@ label {
   gap: 4px;
 }
 
+.price-reference {
+  margin-top: 6px;
+  padding: 10px 12px;
+  color: #0f3d2f;
+  background: #dff3e8;
+  border: 1px solid rgba(45, 125, 87, 0.28);
+  border-radius: 8px;
+}
+
+.price-reference strong {
+  display: block;
+  color: #0f3d2f;
+  font-size: 1.15rem;
+  line-height: 1.15;
+}
+
+.price-reference a {
+  color: #0f3d2f;
+  font-weight: 900;
+}
+
 .lookup-info strong {
   color: var(--primary);
 }

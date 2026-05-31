@@ -15,6 +15,51 @@ let scannerLoop = 0;
 let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
 
+const ARGENTINA_PRODUCT_CATALOG = {
+  "7790990003039": {
+    barcode: "7790990003039",
+    name: "Magistral - Detergente Ultra Limon 500 ml",
+    lastPrice: "",
+    metadata: {
+      brand: "Magistral",
+      quantityLabel: "500 ml",
+      category: "Limpieza / Detergente",
+      productType: "catalogo argentino",
+      imageUrl: "https://images.pricely.ar/images/1/7790990003039.webp",
+      source: "Catalogo argentino + Pricely",
+      priceReference: {
+        bestPrice: 2800.85,
+        averagePrice: 4437.61,
+        dealPrice: 2999.93,
+        source: "Pricely",
+        url: "https://pricely.ar/product/7790990003039",
+        checkedAt: "2026-05-31"
+      }
+    }
+  },
+  "7790520028655": {
+    barcode: "7790520028655",
+    name: "Raid - Mata Moscas y Mosquitos Aerosol 380 ml",
+    lastPrice: "",
+    metadata: {
+      brand: "Raid",
+      quantityLabel: "380 ml",
+      category: "Limpieza / Insecticida",
+      productType: "catalogo argentino",
+      imageUrl: "https://acdn-us.mitiendanube.com/stores/006/012/520/products/farmamix_raid_7790520028655_1-8653a94dea2216754e17642355231076-1024-1024.webp",
+      source: "Catalogo argentino + Farmamix",
+      priceReference: {
+        bestPrice: 5700,
+        averagePrice: 7084.14,
+        dealPrice: 7160,
+        source: "Pricely",
+        url: "https://pricely.ar/product/7790520028655",
+        checkedAt: "2026-05-31"
+      }
+    }
+  }
+};
+
 const $ = (selector) => document.querySelector(selector);
 
 const els = {
@@ -430,21 +475,20 @@ function findProductByBarcode(barcode) {
 
 async function resolveBarcodeProduct(barcode, options = {}) {
   const localProduct = findProductByBarcode(barcode);
+  const catalogProduct = findArgentinaCatalogProduct(barcode);
   const shouldRefreshImage = options.refreshMissingImage && localProduct?.name && !localProduct.metadata?.imageUrl;
+  if (catalogProduct && (!localProduct?.name || !localProduct.metadata?.imageUrl)) {
+    const mergedProduct = mergeProductData(localProduct, catalogProduct);
+    upsertProduct(mergedProduct);
+    saveState();
+    return { ...mergedProduct, source: localProduct?.name ? "local" : "catalog" };
+  }
   if (localProduct?.name && !shouldRefreshImage) return { ...localProduct, source: "local" };
 
   toast("Buscando datos del producto...");
-  const externalProduct = await fetchExternalProduct(barcode);
+  const externalProduct = await fetchExternalProduct(barcode, { product: localProduct });
   if (externalProduct) {
-    const mergedProduct = localProduct
-      ? {
-          ...localProduct,
-          ...externalProduct,
-          name: localProduct.name || externalProduct.name,
-          lastPrice: localProduct.lastPrice || externalProduct.lastPrice,
-          metadata: { ...(localProduct.metadata || {}), ...(externalProduct.metadata || {}) }
-        }
-      : externalProduct;
+    const mergedProduct = mergeProductData(localProduct, externalProduct);
     upsertProduct(mergedProduct);
     saveState();
     toast(mergedProduct.metadata?.imageUrl ? "Producto e imagen encontrados." : "Producto encontrado sin imagen.");
@@ -452,15 +496,45 @@ async function resolveBarcodeProduct(barcode, options = {}) {
   }
 
   if (localProduct?.name) {
-    toast("Producto local encontrado. La base consultada no trajo imagen.");
-    return { ...localProduct, source: "local" };
+    const mergedProduct = mergeProductData(localProduct, catalogProduct);
+    toast(mergedProduct.metadata?.imageUrl ? "Producto local actualizado con imagen." : "Producto local encontrado. La base consultada no trajo imagen.");
+    return { ...mergedProduct, source: "local" };
   }
+
+  if (catalogProduct) return { ...catalogProduct, source: "catalog" };
 
   toast("No encontre datos para ese codigo. Podés cargarlo una vez y queda aprendido.");
   return { barcode, name: "", metadata: {}, source: "missing" };
 }
 
-async function fetchExternalProduct(barcode) {
+function findArgentinaCatalogProduct(barcode) {
+  const product = ARGENTINA_PRODUCT_CATALOG[barcode];
+  return product ? JSON.parse(JSON.stringify(product)) : null;
+}
+
+function mergeProductData(baseProduct, newProduct) {
+  if (!baseProduct) return newProduct;
+  if (!newProduct) return baseProduct;
+  return {
+    ...baseProduct,
+    barcode: baseProduct.barcode || newProduct.barcode,
+    name: chooseBetterName(baseProduct.name, newProduct.name),
+    lastPrice: baseProduct.lastPrice || newProduct.lastPrice,
+    metadata: {
+      ...(baseProduct.metadata || {}),
+      ...(newProduct.metadata || {}),
+      imageUrl: baseProduct.metadata?.imageUrl || newProduct.metadata?.imageUrl || ""
+    }
+  };
+}
+
+function chooseBetterName(currentName, candidateName) {
+  if (!currentName) return candidateName || "";
+  if (!candidateName) return currentName;
+  return candidateName.length > currentName.length ? candidateName : currentName;
+}
+
+async function fetchExternalProduct(barcode, hints = {}) {
   if (!barcode || !navigator.onLine) return null;
 
   const controller = new AbortController();
@@ -491,6 +565,7 @@ async function fetchExternalProduct(barcode) {
 
   try {
     let bestProduct = null;
+    const priceReference = findArgentinaCatalogProduct(barcode)?.metadata?.priceReference || null;
     for (const url of urls) {
       const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
       if (!response.ok) continue;
@@ -511,13 +586,14 @@ async function fetchExternalProduct(barcode) {
           category: firstText(product.categories),
           productType: firstText(product.product_type),
           imageUrl: extractProductImage(product),
-          source: url.includes("openproductsfacts") ? "Open Products Facts" : "Open Food Facts"
+          source: url.includes("openproductsfacts") ? "Open Products Facts" : "Open Food Facts",
+          priceReference
         }
       };
       if (foundProduct.metadata.imageUrl) return foundProduct;
       bestProduct = bestProduct || foundProduct;
     }
-    const marketplaceProduct = await fetchMercadoLibreProduct(barcode, controller.signal);
+    const marketplaceProduct = await fetchMercadoLibreProduct(barcode, controller.signal, bestProduct || hints.product);
     if (marketplaceProduct?.metadata?.imageUrl) {
       return bestProduct
         ? {
@@ -525,12 +601,16 @@ async function fetchExternalProduct(barcode) {
             metadata: {
               ...bestProduct.metadata,
               imageUrl: marketplaceProduct.metadata.imageUrl,
-              source: `${bestProduct.metadata.source} + Mercado Libre`
+              source: `${bestProduct.metadata.source} + Mercado Libre`,
+              priceReference: bestProduct.metadata.priceReference || priceReference
             }
           }
         : marketplaceProduct;
     }
-    return bestProduct || marketplaceProduct;
+    if (marketplaceProduct && priceReference) {
+      marketplaceProduct.metadata.priceReference = priceReference;
+    }
+    return bestProduct || marketplaceProduct || (priceReference ? { barcode, name: "", lastPrice: "", metadata: { priceReference, source: "Pricely" } } : null);
   } catch {
     return null;
   } finally {
@@ -538,31 +618,135 @@ async function fetchExternalProduct(barcode) {
   }
 }
 
-async function fetchMercadoLibreProduct(barcode, signal) {
+async function fetchPriceReference(barcode, signal) {
   try {
-    const url = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(barcode)}&limit=5`;
+    const url = `https://pricely.ar/product/${encodeURIComponent(barcode)}`;
     const response = await fetch(url, { signal, cache: "no-store" });
     if (!response.ok) return null;
-    const data = await response.json();
-    const result = data.results?.find((item) => normalize(item.title).includes(normalize(barcode)) || item.title) || data.results?.[0];
-    if (!result?.title) return null;
+    const html = await response.text();
+    const bestPrice = extractPriceAfterLabel(html, "Mejor precio");
+    if (!bestPrice) return null;
 
     return {
-      barcode,
-      name: cleanMarketplaceTitle(result.title),
-      lastPrice: "",
-      metadata: {
-        brand: "",
-        quantityLabel: "",
-        category: "",
-        productType: "marketplace",
-        imageUrl: improveMercadoLibreImage(result.thumbnail || result.secure_thumbnail || ""),
-        source: "Mercado Libre"
-      }
+      bestPrice,
+      averagePrice: extractPriceAfterLabel(html, "Promedio"),
+      dealPrice: extractPriceAfterLabel(html, "Con descuentos"),
+      source: "Pricely",
+      url,
+      checkedAt: new Date().toISOString().slice(0, 10)
     };
   } catch {
     return null;
   }
+}
+
+function extractPriceAfterLabel(html, label) {
+  const index = html.indexOf(label);
+  if (index < 0) return null;
+  const chunk = html.slice(index, index + 420).replace(/<[^>]+>/g, " ");
+  const match = chunk.match(/\$\s*([0-9.]+)\s*,\s*([0-9]{2})/);
+  if (!match) return null;
+  return Number(`${match[1].replaceAll(".", "")}.${match[2]}`);
+}
+
+async function fetchMercadoLibreProduct(barcode, signal, hintProduct = null) {
+  try {
+    const queries = buildMercadoLibreQueries(barcode, hintProduct);
+    for (const query of queries) {
+      const url = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(query)}&limit=8`;
+      const response = await fetch(url, { signal, cache: "no-store" });
+      if (!response.ok) continue;
+      const data = await response.json();
+      const result = pickMercadoLibreResult(query, data.results || []);
+      if (!result?.title) continue;
+
+      return {
+        barcode,
+        name: cleanMarketplaceTitle(result.title),
+        lastPrice: "",
+        metadata: {
+          brand: hintProduct?.metadata?.brand || "",
+          quantityLabel: hintProduct?.metadata?.quantityLabel || "",
+          category: hintProduct?.metadata?.category || "",
+          productType: "marketplace",
+          imageUrl: improveMercadoLibreImage(result.thumbnail || result.secure_thumbnail || ""),
+          source: `Mercado Libre (${query})`
+        }
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function buildMercadoLibreQueries(barcode, hintProduct) {
+  const brand = hintProduct?.metadata?.brand || "";
+  const name = hintProduct?.name || "";
+  return uniqueValues([
+    simplifyProductSearch(`${brand} ${name}`),
+    simplifyProductSearch(name),
+    simplifyProductSearch(removePackaging(name)),
+    barcode
+  ]).filter((query) => query && query.length >= 4);
+}
+
+function pickMercadoLibreResult(query, results) {
+  const queryTokens = searchTokens(query);
+  const isBarcode = /^\d{8,14}$/.test(query.trim());
+
+  if (isBarcode) {
+    return results.find((item) => item.thumbnail || item.secure_thumbnail) || results[0] || null;
+  }
+
+  const scored = results
+    .map((item) => ({
+      item,
+      score: scoreMarketplaceTitle(queryTokens, item.title || "") + (item.thumbnail || item.secure_thumbnail ? 0.15 : 0)
+    }))
+    .filter((entry) => entry.score >= 0.48)
+    .sort((a, b) => b.score - a.score);
+
+  return scored[0]?.item || null;
+}
+
+function scoreMarketplaceTitle(queryTokens, title) {
+  if (!queryTokens.length || !title) return 0;
+  const titleTokens = searchTokens(title);
+  const hits = queryTokens.filter((token) => titleTokens.some((titleToken) => titleToken.includes(token) || token.includes(titleToken))).length;
+  return hits / queryTokens.length;
+}
+
+function searchTokens(value) {
+  const stopwords = new Set(["de", "del", "la", "el", "los", "las", "y", "x", "por", "con", "sin", "para", "ml", "gr", "g", "cc"]);
+  return normalize(value)
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((token) => token.length > 2 && !stopwords.has(token));
+}
+
+function simplifyProductSearch(value) {
+  return normalize(value)
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function removePackaging(value) {
+  return String(value || "")
+    .replace(/\b\d+([.,]\d+)?\s?(ml|cc|l|litro|litros|g|gr|kg|kilo|kilos|un|unidad|unidades)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function uniqueValues(values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const key = normalize(value);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function cleanMarketplaceTitle(title) {
@@ -626,6 +810,7 @@ function findFirstImageUrl(value) {
 }
 
 async function fillProductFromBarcode(force = false) {
+  clearTimeout(barcodeLookupTimer);
   const barcode = els.barcodeInput.value.trim();
   if (!barcode || (!force && els.productNameInput.value.trim())) return;
   renderLookupInfo({
@@ -725,9 +910,25 @@ function renderLookupInfo(product) {
       ${!metadata.imageUrl && hasInfo && !product.loading ? "<small>Imagen no disponible en la base consultada.</small>" : ""}
       ${!hasInfo ? "<small>Podés cargarlo manualmente y quedará guardado para la próxima.</small>" : ""}
       <small>Fuente: ${escapeHtml(source)}</small>
+      ${priceReferenceHtml(metadata.priceReference)}
     </div>
   `;
   $("#productPhotoTrigger")?.addEventListener("click", () => els.productPhotoInput.click());
+}
+
+function priceReferenceHtml(reference) {
+  if (!reference?.bestPrice) return "";
+  const checkedAt = reference.checkedAt ? `Actualizado: ${escapeHtml(reference.checkedAt)}` : "";
+  const average = reference.averagePrice ? `Promedio: ${currency.format(reference.averagePrice)}` : "";
+  const details = [average, checkedAt].filter(Boolean).join(" | ");
+  return `
+    <div class="price-reference">
+      <small>Mejor precio consumidor encontrado</small>
+      <strong>${currency.format(reference.bestPrice)}</strong>
+      ${details ? `<small>${details}</small>` : ""}
+      ${reference.url ? `<small><a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener">Ver fuente: ${escapeHtml(reference.source || "referencia")}</a></small>` : ""}
+    </div>
+  `;
 }
 
 function addShoppingListItem(event) {

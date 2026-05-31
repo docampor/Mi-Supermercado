@@ -47,6 +47,7 @@ async function run() {
   const messages = [];
   const testBarcode = "7791234567890";
   const missingPhotoBarcode = "7790520028655";
+  const catalogBarcode = "7790990003039";
   let productRouteHit = false;
 
   page.on("console", (msg) => {
@@ -91,22 +92,45 @@ async function run() {
   await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v3/product/${missingPhotoBarcode}.*`), (route) => {
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
   });
-  await page.route(new RegExp(`https://api\\.mercadolibre\\.com/sites/MLA/search.*${missingPhotoBarcode}.*`), (route) => {
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        results: [
-          {
-            title: "Raid Mata Moscas Y Mosquitos 380 Ml",
-            thumbnail: "https://http2.mlstatic.com/D_12345-I.jpg"
-          }
-        ]
-      })
-    });
+  await page.route(/https:\/\/api\.mercadolibre\.com\/sites\/MLA\/search.*/, (route) => {
+    const url = new URL(route.request().url());
+    const query = url.searchParams.get("q") || "";
+    if (query.includes("raid") && query.includes("mata")) {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          results: [
+            {
+              title: "Raid Mata Moscas Y Mosquitos 380 Ml",
+              thumbnail: "https://http2.mlstatic.com/D_12345-I.jpg"
+            }
+          ]
+        })
+      });
+      return;
+    }
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ results: [] }) });
   });
 
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
+  await page.evaluate((barcode) => localStorage.setItem("control-stock-v1", JSON.stringify({
+    products: [
+      {
+        id: "old-raid",
+        barcode,
+        name: "raid - mata miscas",
+        lastPrice: 2000,
+        metadata: { brand: "raid" },
+        updatedAt: new Date().toISOString()
+      }
+    ],
+    purchases: [],
+    shoppingList: [],
+    stock: []
+  })), missingPhotoBarcode);
+  await page.reload({ waitUntil: "networkidle" });
+
   await page.getByRole("button", { name: "Cargar manual" }).click();
   await page.locator("#barcodeInput").fill(testBarcode);
   await page.evaluate(() => window.fillProductFromBarcode(true));
@@ -122,8 +146,14 @@ async function run() {
     throw new Error(`No autocomplete: route=${productRouteHit} debug=${JSON.stringify(debug)}`);
   }
   const lookupImageSrc = await page.locator(".lookup-image").getAttribute("src");
-  await page.locator("#quantityInput").fill("2");
-  await page.locator("#unitPriceInput").fill("1250");
+  await page.locator("#quantityInput").evaluate((input) => {
+    input.value = "2";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.locator("#unitPriceInput").evaluate((input) => {
+    input.value = "1250";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
   await page.locator("#productForm button[type='submit']").click();
   try {
     await page.locator("#productDialog").waitFor({ state: "hidden", timeout: 5000 });
@@ -151,6 +181,14 @@ async function run() {
   const fallbackImageSrc = await page.locator(".lookup-image").getAttribute("src");
   await page.locator("#closeProductButton").click();
 
+  await page.getByRole("button", { name: "Cargar manual" }).click();
+  await page.locator("#barcodeInput").fill(catalogBarcode);
+  await page.evaluate(() => window.fillProductFromBarcode(true));
+  await page.waitForFunction(() => document.querySelector("#productNameInput").value.includes("Magistral"), null, { timeout: 5000 });
+  const catalogImageSrc = await page.locator(".lookup-image").getAttribute("src");
+  const catalogPriceText = await page.locator(".price-reference").innerText();
+  await page.locator("#closeProductButton").click();
+
   await page.getByRole("button", { name: "Stock" }).click();
   await page.locator("#stockNameInput").fill("Arroz");
   await page.locator("#stockQtyInput").fill("3");
@@ -166,6 +204,8 @@ async function run() {
     purchaseSaved: bodyText.includes("Salsa lista"),
     lookupImageVisible: Boolean(lookupImageSrc),
     fallbackImageVisible: Boolean(fallbackImageSrc),
+    catalogImageVisible: Boolean(catalogImageSrc),
+    priceReferenceVisible: catalogPriceText.includes("Mejor precio") && catalogPriceText.includes("$"),
     imageSaved: await page.locator(".product-thumb").count() > 0
   };
 
