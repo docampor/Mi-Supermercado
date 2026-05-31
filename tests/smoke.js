@@ -87,9 +87,11 @@ async function run() {
     }));
     throw new Error(`No autocomplete: route=${productRouteHit} debug=${JSON.stringify(debug)}`);
   }
+  const lookupImageSrc = await page.locator(".lookup-image").getAttribute("src");
   await page.locator("#quantityInput").fill("2");
   await page.locator("#unitPriceInput").fill("1250");
-  await page.getByRole("button", { name: "Guardar" }).click();
+  await page.locator("#productForm button[type='submit']").click();
+  await page.locator("#productDialog").waitFor({ state: "hidden", timeout: 5000 });
 
   await page.getByRole("button", { name: "Lista" }).click();
   await page.getByPlaceholder("Mayonesa, fideos, limpiador...").fill("Mayonesa");
@@ -109,6 +111,7 @@ async function run() {
     appTitle: bodyText.includes("Control de Stock"),
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
+    lookupImageVisible: Boolean(lookupImageSrc),
     imageSaved: await page.locator(".product-thumb").count() > 0
   };
 

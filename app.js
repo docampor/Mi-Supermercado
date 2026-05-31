@@ -278,7 +278,7 @@ function openProductDialog(options = {}) {
 function queueBarcodeLookup() {
   clearTimeout(barcodeLookupTimer);
   const barcode = els.barcodeInput.value.trim();
-  if (barcode.length < 8 || els.productNameInput.value.trim()) return;
+  if (barcode.length < 8) return;
   barcodeLookupTimer = setTimeout(fillProductFromBarcode, 450);
 }
 
@@ -457,8 +457,12 @@ async function fetchExternalProduct(barcode) {
     "categories",
     "product_type",
     "image_url",
+    "image_small_url",
+    "image_thumb_url",
     "image_front_url",
     "image_front_small_url",
+    "image_front_thumb_url",
+    "image_front_display_url",
     "selected_images"
   ].join(",");
   const urls = [
@@ -512,26 +516,60 @@ function firstText(value) {
 }
 
 function extractProductImage(product) {
-  const direct = firstText(product.image_front_small_url) || firstText(product.image_front_url) || firstText(product.image_url);
+  const direct =
+    firstText(product.image_front_display_url) ||
+    firstText(product.image_front_small_url) ||
+    firstText(product.image_front_thumb_url) ||
+    firstText(product.image_front_url) ||
+    firstText(product.image_small_url) ||
+    firstText(product.image_thumb_url) ||
+    firstText(product.image_url);
   if (direct) return direct;
 
-  const selected = product.selected_images?.front;
-  const language = selected?.display?.es || selected?.display?.en || selected?.display?.fr || selected?.small?.es || selected?.small?.en || selected?.small?.fr;
-  if (typeof language === "string") return language;
-  if (language?.url) return language.url;
+  const selectedUrl = findFirstImageUrl(product.selected_images);
+  if (selectedUrl) return selectedUrl;
 
+  return "";
+}
+
+function findFirstImageUrl(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.startsWith("http") ? value : "";
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findFirstImageUrl(item);
+      if (found) return found;
+    }
+    return "";
+  }
+  if (typeof value === "object") {
+    const preferredKeys = ["es", "en", "display", "small", "front", "url"];
+    for (const key of preferredKeys) {
+      const found = findFirstImageUrl(value[key]);
+      if (found) return found;
+    }
+    for (const item of Object.values(value)) {
+      const found = findFirstImageUrl(item);
+      if (found) return found;
+    }
+  }
   return "";
 }
 
 async function fillProductFromBarcode(force = false) {
   const barcode = els.barcodeInput.value.trim();
   if (!barcode || (!force && els.productNameInput.value.trim())) return;
+  renderLookupInfo({
+    name: els.productNameInput.value.trim() || "Buscando producto...",
+    metadata: { source: "consulta online" },
+    loading: true
+  });
   const product = await resolveBarcodeProduct(barcode);
   if (product?.name) {
     els.productNameInput.value = product.name;
     els.productForm.dataset.productMetadata = JSON.stringify(product.metadata || {});
-    renderLookupInfo(product);
   }
+  renderLookupInfo(product);
 }
 
 function readProductMetadata() {
@@ -543,14 +581,22 @@ function readProductMetadata() {
 }
 
 function renderLookupInfo(product) {
-  const metadata = product?.metadata || {};
-  if (!product?.name && !metadata.brand && !metadata.quantityLabel && !metadata.category) {
+  if (!product) {
     els.productLookupInfo.hidden = true;
     els.productLookupInfo.innerHTML = "";
     return;
   }
 
-  const source = product.source === "local" ? "catalogo local" : metadata.source || "datos guardados";
+  const metadata = product?.metadata || {};
+  const hasInfo = product?.name || metadata.brand || metadata.quantityLabel || metadata.category || metadata.imageUrl;
+
+  const source = product.loading
+    ? "consulta online"
+    : product.source === "local"
+      ? "catalogo local"
+      : product.source === "missing"
+        ? "sin resultado"
+        : metadata.source || "datos guardados";
   const details = [
     metadata.brand ? `Marca: ${metadata.brand}` : "",
     metadata.quantityLabel ? `Presentacion: ${metadata.quantityLabel}` : "",
@@ -559,10 +605,12 @@ function renderLookupInfo(product) {
 
   els.productLookupInfo.hidden = false;
   els.productLookupInfo.innerHTML = `
-    ${metadata.imageUrl ? `<img class="lookup-image" src="${escapeHtml(metadata.imageUrl)}" alt="${escapeHtml(product.name || "Producto")}">` : ""}
+    ${metadata.imageUrl ? `<img class="lookup-image" src="${escapeHtml(metadata.imageUrl)}" alt="${escapeHtml(product.name || "Producto")}">` : `<div class="lookup-image placeholder" aria-hidden="true">Sin foto</div>`}
     <div class="lookup-copy">
-      <strong>${escapeHtml(product.name || "Producto encontrado")}</strong>
+      <strong>${escapeHtml(product.name || (hasInfo ? "Producto encontrado" : "Producto no encontrado"))}</strong>
       ${details.length ? `<small>${escapeHtml(details.join(" | "))}</small>` : ""}
+      ${!metadata.imageUrl && hasInfo && !product.loading ? "<small>Imagen no disponible en la base consultada.</small>" : ""}
+      ${!hasInfo ? "<small>Podés cargarlo manualmente y quedará guardado para la próxima.</small>" : ""}
       <small>Fuente: ${escapeHtml(source)}</small>
     </div>
   `;
