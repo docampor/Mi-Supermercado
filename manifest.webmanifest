@@ -1,0 +1,18 @@
+{
+  "name": "Control de Stock",
+  "short_name": "Stock",
+  "description": "Control local de compras, lista y stock del supermercado.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f5f2ea",
+  "theme_color": "#184c48",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

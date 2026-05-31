@@ -1,0 +1,16 @@
+{
+  "name": "control-de-stock",
+  "version": "1.0.0",
+  "description": "App local para controlar compras de supermercado, lista rapida, stock en casa, informes mensuales y exportacion compatible con Excel.",
+  "main": "app.js",
+  "scripts": {
+    "smoke": "C:\\PROGRA~1\\nodejs\\node.exe tests/smoke.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}
