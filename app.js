@@ -860,6 +860,36 @@ function detectCleaningCategory(name) {
   return "Limpieza";
 }
 
+function inferProductCategory(name, metadata = {}) {
+  const savedCategory = firstCategory(metadata.category);
+  if (savedCategory) return savedCategory;
+
+  const normalized = normalize(name);
+  const rules = [
+    ["Lacteos", ["leche", "yogur", "queso", "manteca", "crema", "dulce de leche", "postre", "flan"]],
+    ["Almacen", ["fideo", "pasta", "arroz", "harina", "polenta", "aceite", "azucar", "yerba", "cafe", "te", "sal", "salsa", "pure", "tomate", "conserva", "lenteja", "garbanzo", "atun"]],
+    ["Limpieza", ["detergente", "lavandina", "limpiador", "procenex", "ayudin", "raid", "insecticida", "desinfectante", "jabon", "suavizante", "esponja", "bolsa"]],
+    ["Bebidas", ["agua", "gaseosa", "jugo", "cerveza", "vino", "soda", "isotonica", "energizante"]],
+    ["Panaderia", ["pan", "galleta", "galletita", "tostada", "budin", "factura", "bizcocho"]],
+    ["Congelados", ["congelado", "helado", "freezer", "hamburguesa", "nugget", "papas"]],
+    ["Frescos", ["carne", "pollo", "pescado", "huevo", "fiambre", "verdura", "fruta", "manzana", "banana", "tomate", "lechuga", "cebolla", "papa"]],
+    ["Perfumeria", ["shampoo", "acondicionador", "desodorante", "crema", "pasta dental", "cepillo", "pañal", "panal", "toallita"]],
+    ["Mascotas", ["perro", "gato", "mascota", "alimento balanceado", "arena"]]
+  ];
+
+  const match = rules.find(([, words]) => words.some((word) => normalized.includes(word)));
+  return match?.[0] || "Otros";
+}
+
+function firstCategory(value) {
+  const raw = firstText(value);
+  if (!raw) return "";
+  return raw
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)[0] || "";
+}
+
 function extractQuantityLabel(name) {
   const match = String(name || "").match(/\b\d+(?:[.,]\d+)?\s?(ml|cc|l|lt|lts|g|kg)\b/i);
   return match ? match[0].replace("lt", "l").replace("lts", "l") : "";
@@ -1477,6 +1507,7 @@ function addShoppingListEntry(name, quantity = "") {
   const existing = state.shoppingList.find((item) => normalize(item.name) === normalized);
   if (existing) {
     existing.quantity = existing.quantity || String(quantity || "");
+    existing.category = existing.category || inferProductCategory(existing.name);
     existing.updatedAt = new Date().toISOString();
     return existing;
   }
@@ -1485,6 +1516,7 @@ function addShoppingListEntry(name, quantity = "") {
     id: uid("list"),
     name,
     quantity: String(quantity || ""),
+    category: inferProductCategory(name),
     checked: false,
     createdAt: new Date().toISOString()
   };
@@ -1504,6 +1536,7 @@ function renderShoppingList() {
         <div>
           <strong>${escapeHtml(item.name)}</strong>
           <small>${item.quantity ? `Cantidad: ${escapeHtml(item.quantity)}` : "Sin cantidad"}</small>
+          <span class="category-pill">${escapeHtml(inferProductCategory(item.name, item.metadata))}</span>
         </div>
       </div>
       <div class="card-actions">
@@ -1585,6 +1618,7 @@ function adjustStock(name, barcode, quantity, replace, minStock = null) {
     item.quantity = replace ? quantity : Math.max(0, Number(item.quantity || 0) + quantity);
     item.minStock = normalizeMinStock(minStock, item.minStock);
     item.metadata = { ...(item.metadata || {}), ...(product?.metadata || {}) };
+    item.category = inferProductCategory(name, item.metadata);
     item.updatedAt = new Date().toISOString();
     return item;
   } else {
@@ -1595,6 +1629,7 @@ function adjustStock(name, barcode, quantity, replace, minStock = null) {
       quantity: Math.max(0, quantity),
       minStock: normalizeMinStock(minStock, 1),
       metadata: product?.metadata || {},
+      category: inferProductCategory(name, product?.metadata || {}),
       updatedAt: new Date().toISOString()
     };
     state.stock.push(newItem);
@@ -1623,6 +1658,7 @@ function renderStock() {
             <strong>${escapeHtml(item.name)}</strong>
             <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
             <small>Minimo: ${formatNumber(getMinStock(item))}</small>
+            <span class="category-pill">${escapeHtml(inferProductCategory(item.name, item.metadata))}</span>
             ${isLowStock(item) ? "<span class=\"stock-badge\">Reponer</span>" : ""}
           </div>
         </div>
@@ -2028,7 +2064,7 @@ function exportExcel() {
       <body>
         ${tableHtml("Compras", rows, ["fecha", "codigo", "producto", "marca", "presentacion", "categoria", "cantidad", "precioUnitario", "promocion", "total"])}
         ${tableHtml("Stock", state.stock, ["barcode", "name", "quantity", "minStock", "updatedAt"])}
-        ${tableHtml("Lista", state.shoppingList, ["name", "quantity", "createdAt"])}
+        ${tableHtml("Lista", state.shoppingList.map((item) => ({ ...item, category: inferProductCategory(item.name, item.metadata) })), ["category", "name", "quantity", "createdAt"])}
       </body>
     </html>
   `;
@@ -2051,25 +2087,28 @@ function exportBackup() {
 
 function shareShoppingListReport() {
   const lines = state.shoppingList.length
-    ? state.shoppingList.map((item) => `- ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`)
+    ? groupedReportLines(state.shoppingList, (item) => ({
+        category: inferProductCategory(item.name, item.metadata),
+        line: `${item.name}${item.quantity ? ` - cant. ${item.quantity}` : ""}`
+      }))
     : ["Sin productos en la lista."];
   shareOrDownloadReport("Lista de compras", lines, "lista-compras");
 }
 
 function shareStockReport() {
   const lines = state.stock.length
-    ? state.stock
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, "es"))
-        .map((item) => `- ${item.name}: ${formatNumber(item.quantity)} disponible${item.minStock !== undefined ? ` | minimo ${formatNumber(getMinStock(item))}` : ""}`)
+    ? groupedReportLines(state.stock, (item) => ({
+        category: inferProductCategory(item.name, item.metadata),
+        line: `${item.name} - ${formatNumber(item.quantity)} disp.`
+      }))
     : ["Sin stock cargado."];
   shareOrDownloadReport("Stock actual", lines, "stock-actual");
 }
 
 async function shareOrDownloadReport(title, lines, filenamePrefix) {
   const text = [
-    title,
-    `Generado: ${formatDateTime(new Date().toISOString())}`,
+    title.toUpperCase(),
+    formatDateTime(new Date().toISOString()),
     "",
     ...lines
   ].join("\n");
@@ -2086,6 +2125,24 @@ async function shareOrDownloadReport(title, lines, filenamePrefix) {
 
   downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), `${filenamePrefix}-${dateFileKey(new Date())}.txt`);
   toast("Listado generado para imprimir o compartir.");
+}
+
+function groupedReportLines(items, mapper) {
+  const groups = new Map();
+  items.forEach((item) => {
+    const mapped = mapper(item);
+    const category = mapped.category || "Otros";
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(mapped.line);
+  });
+
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a.localeCompare(b, "es"))
+    .flatMap(([category, lines]) => [
+      `[${category}]`,
+      ...lines.sort((a, b) => a.localeCompare(b, "es")).map((line) => `  - ${line}`),
+      ""
+    ]);
 }
 
 function clearAllData() {

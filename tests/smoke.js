@@ -333,10 +333,16 @@ async function run() {
   const bodyText = await page.locator("body").innerText();
   const listReportDownloadPromise = page.waitForEvent("download");
   await page.locator("#shareListButton").click();
-  const listReportFilename = (await listReportDownloadPromise).suggestedFilename();
+  const listReportDownload = await listReportDownloadPromise;
+  const listReportFilename = listReportDownload.suggestedFilename();
+  const listReportPath = await listReportDownload.path();
+  const listReportText = fs.readFileSync(listReportPath, "utf8");
   const stockReportDownloadPromise = page.waitForEvent("download");
   await page.locator("#shareStockButton").click();
-  const stockReportFilename = (await stockReportDownloadPromise).suggestedFilename();
+  const stockReportDownload = await stockReportDownloadPromise;
+  const stockReportFilename = stockReportDownload.suggestedFilename();
+  const stockReportPath = await stockReportDownload.path();
+  const stockReportText = fs.readFileSync(stockReportPath, "utf8");
   const productThumbCountBeforeImport = await page.locator(".product-thumb").count();
   const backupDownloadPromise = page.waitForEvent("download");
   await page.locator("#exportBackupButton").click();
@@ -389,7 +395,8 @@ async function run() {
     listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
     lowStockVisible: lowStockText.includes("Para reponer") && lowStockText.includes("Leche") && lowStockText.includes("Minimo"),
     restockListAdded: restockListText.includes("Leche") && restockListText.includes("Escanear codigo"),
-    printableReports: listReportFilename.includes("lista-compras") && stockReportFilename.includes("stock-actual"),
+    printableReports: listReportFilename.includes("lista-compras") && stockReportFilename.includes("stock-actual") &&
+      listReportText.includes("[") && listReportText.includes("Mayonesa") && stockReportText.includes("[") && stockReportText.includes("Leche"),
     clearDataVisible: bodyText.includes("Limpiar datos"),
     backupExported: backupFilename.endsWith(".json") && backupFilename.includes("control-stock-backup"),
     backupImported: importedState.shoppingList.some((item) => item.name === "Cafe importado") &&
