@@ -18,6 +18,7 @@ let scannerCandidateAt = 0;
 let scannerConfirmedCode = "";
 let scannerConfirmedProduct = null;
 let scannerDetectingPaused = false;
+let scannerMode = "purchase";
 let stockAlertNotifiedKeys = new Set();
 let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
@@ -491,15 +492,14 @@ function renderPurchase() {
 
 function scanForPurchase(listItemId = null) {
   pendingListItemId = listItemId;
-  openScanner(async (barcode, scannedProduct = null) => {
+  openScanner("purchase", async (barcode, scannedProduct = null) => {
     const product = scannedProduct || await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
     const listItem = pendingListItemId ? state.shoppingList.find((item) => item.id === pendingListItemId) : null;
-    openProductDialog({
-      context: "purchase",
+    addScannedProductToPurchase({
       barcode,
       name: product?.name || listItem?.name || "",
       quantity: parseNumber(listItem?.quantity) || 1,
-      unitPrice: product?.lastPrice || "",
+      unitPrice: product?.lastPrice || 0,
       productInfo: product
     });
   });
@@ -562,6 +562,40 @@ function removePurchaseItem(itemId) {
   if (item) adjustStock(item.name, item.barcode, -Number(item.quantity || 0), false);
   saveState();
   render();
+}
+
+function addScannedProductToPurchase(options) {
+  const barcode = options.barcode || "";
+  const product = options.productInfo || findProductByBarcode(barcode);
+  const name = options.name || product?.name || `Producto ${barcode}`;
+  const quantity = Math.max(0.01, parseNumber(options.quantity) || 1);
+  const unitPrice = parseNumber(options.unitPrice);
+  const promo = { enabled: false, quantity: 0, price: 0 };
+  const metadata = product?.metadata || {};
+  const total = calculateTotal(quantity, unitPrice, promo);
+
+  upsertProduct({ barcode, name, lastPrice: unitPrice, metadata });
+  ensureActivePurchase().items.push({
+    id: uid("item"),
+    barcode,
+    name,
+    quantity,
+    unitPrice,
+    promo,
+    total,
+    metadata,
+    createdAt: new Date().toISOString()
+  });
+  adjustStock(name, barcode, quantity, false);
+
+  if (pendingListItemId) {
+    state.shoppingList = state.shoppingList.filter((item) => item.id !== pendingListItemId);
+    pendingListItemId = null;
+  }
+
+  saveState();
+  render();
+  toast(`${name} agregado. Podes seguir escaneando.`);
 }
 
 function saveProductEntry(event) {
@@ -1514,16 +1548,14 @@ function saveStockFromForm(event) {
 }
 
 function scanForStock() {
-  openScanner(async (barcode, scannedProduct = null) => {
+  openScanner("stock", async (barcode, scannedProduct = null) => {
     const product = scannedProduct || await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
-    openProductDialog({
-      context: "stock",
-      barcode,
-      name: product?.name || "",
-      quantity: 1,
-      unitPrice: product?.lastPrice || 0,
-      productInfo: product
-    });
+    const name = product?.name || `Producto ${barcode}`;
+    const stockItem = adjustStock(name, barcode, 1, false);
+    maybeNotifyLowStock(stockItem);
+    saveState();
+    render();
+    toast(`${name} sumado al stock. Podes seguir escaneando.`);
   });
 }
 
@@ -1756,12 +1788,13 @@ function renderPurchaseHistoryCard(purchase) {
   `;
 }
 
-async function openScanner(callback) {
-  scannerCallback = callback;
+async function openScanner(mode, callback) {
+  scannerMode = typeof mode === "string" ? mode : "purchase";
+  scannerCallback = typeof mode === "function" ? mode : callback;
   els.manualBarcodeInput.value = "";
   resetScannerCandidate();
   clearScannerResult();
-  els.scannerMessage.textContent = "Apunta al codigo de barras del producto.";
+  els.scannerMessage.textContent = "Apunta a una franja limpia del codigo. Confirmas con OK y seguis.";
   els.scannerDialog.showModal();
 
   if (!("BarcodeDetector" in window) || !navigator.mediaDevices?.getUserMedia) {
@@ -1772,19 +1805,17 @@ async function openScanner(callback) {
 
   try {
     scannerStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        focusMode: { ideal: "continuous" }
-      },
+      video: { facingMode: { ideal: "environment" } },
       audio: false
     });
     els.scannerVideo.srcObject = scannerStream;
     await els.scannerVideo.play();
-    const detector = new BarcodeDetector({
-      formats: ["ean_13", "ean_8", "upc_a", "upc_e"]
-    });
+    const supportedFormats = BarcodeDetector.getSupportedFormats
+      ? await BarcodeDetector.getSupportedFormats()
+      : [];
+    const preferredFormats = ["ean_13", "ean_8", "upc_a", "upc_e"];
+    const formats = preferredFormats.filter((format) => !supportedFormats.length || supportedFormats.includes(format));
+    const detector = formats.length ? new BarcodeDetector({ formats }) : new BarcodeDetector();
     scanFrame(detector);
   } catch {
     els.scannerMessage.textContent = "No pude abrir la camara. Revisa el permiso o ingresa el codigo manualmente.";
@@ -1804,11 +1835,11 @@ async function scanFrame(detector) {
     if (codes.length) {
       const code = normalizeBarcodeValue(codes[0].rawValue);
       if (!isRetailBarcode(code)) {
-        els.scannerMessage.textContent = "Esa lectura no parece un codigo de supermercado. Ajusta el enfoque o cargalo manualmente.";
+        els.scannerMessage.textContent = `Lei ${code}, pero no parece un EAN/UPC valido. Proba acercar o alejar un poco.`;
       } else if (confirmScannerCandidate(code)) {
         await previewDetectedScan(code);
       } else {
-        els.scannerMessage.textContent = `Lei ${code}. Mantenelo quieto un segundo para confirmarlo.`;
+        els.scannerMessage.textContent = `Lei ${code}. Mantenelo quieto para confirmar.`;
       }
     }
   } catch {
@@ -1842,8 +1873,14 @@ async function previewDetectedScan(code) {
 function confirmDetectedScan() {
   if (!scannerConfirmedCode) return;
   const callback = scannerCallback;
-  closeScanner();
-  if (callback) callback(scannerConfirmedCode, scannerConfirmedProduct);
+  const code = scannerConfirmedCode;
+  const product = scannerConfirmedProduct;
+  clearScannerResult();
+  resetScannerCandidate();
+  els.scannerMessage.textContent = scannerMode === "stock"
+    ? "Producto sumado. Apunta al siguiente codigo."
+    : "Producto agregado. Apunta al siguiente codigo.";
+  if (callback) callback(code, product);
 }
 
 function rejectDetectedScan() {
@@ -1929,7 +1966,7 @@ function confirmScannerCandidate(code) {
     scannerCandidateCount = 1;
   }
   scannerCandidateAt = now;
-  return scannerCandidateCount >= 3;
+  return scannerCandidateCount >= 1;
 }
 
 function resetScannerCandidate() {
@@ -2133,6 +2170,7 @@ window.removePurchaseItem = removePurchaseItem;
 window.scanForPurchase = scanForPurchase;
 window.sendListItemToPurchase = sendListItemToPurchase;
 window.closeProductDialog = closeProductDialog;
+window.confirmDetectedScan = confirmDetectedScan;
 window.editListItem = editListItem;
 window.deleteListItem = deleteListItem;
 window.changeStock = changeStock;

@@ -385,8 +385,10 @@ async function run() {
       importedState.stock.some((item) => item.name === "Yerba importada"),
     scannerUsesRetailFormatsOnly: await page.evaluate(() => {
       const source = window.openScanner.toString();
+      const confirmSource = window.confirmDetectedScan.toString();
       return source.includes("ean_13") && source.includes("upc_a") && !source.includes("code_128") && !source.includes("code_39") &&
-        Boolean(document.querySelector("#scannerResult")) && Boolean(document.querySelector("#scannerConfirmActions"));
+        Boolean(document.querySelector("#scannerResult")) && Boolean(document.querySelector("#scannerConfirmActions")) &&
+        !confirmSource.includes("closeScanner()");
     }),
     lookupImageVisible: Boolean(lookupImageSrc),
     goUpcSourceVisible: lookupImageSrc.includes("go-upc"),
