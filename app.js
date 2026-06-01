@@ -489,6 +489,7 @@ function renderPurchase() {
           <div>
             <strong>${escapeHtml(item.name)}</strong>
             <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
+            <span class="category-pill">${escapeHtml(inferProductCategory(item.name, item.metadata))}</span>
           </div>
         </div>
         <div class="price">${currency.format(item.total)}</div>
@@ -867,7 +868,7 @@ function inferProductCategory(name, metadata = {}) {
   const normalized = normalize(name);
   const rules = [
     ["Lacteos", ["leche", "yogur", "queso", "manteca", "crema", "dulce de leche", "postre", "flan"]],
-    ["Almacen", ["fideo", "pasta", "arroz", "harina", "polenta", "aceite", "azucar", "yerba", "cafe", "te", "sal", "salsa", "pure", "tomate", "conserva", "lenteja", "garbanzo", "atun"]],
+    ["Almacen", ["fideo", "pasta", "arroz", "harina", "polenta", "aceite", "azucar", "yerba", "cafe", "te", "sal", "salsa", "pure", "tomate", "conserva", "lenteja", "garbanzo", "atun", "mayonesa", "ketchup", "mostaza"]],
     ["Limpieza", ["detergente", "lavandina", "limpiador", "procenex", "ayudin", "raid", "insecticida", "desinfectante", "jabon", "suavizante", "esponja", "bolsa"]],
     ["Bebidas", ["agua", "gaseosa", "jugo", "cerveza", "vino", "soda", "isotonica", "energizante"]],
     ["Panaderia", ["pan", "galleta", "galletita", "tostada", "budin", "factura", "bizcocho"]],

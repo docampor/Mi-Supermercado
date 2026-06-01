@@ -238,6 +238,7 @@ async function run() {
     }));
     throw new Error(`Dialog did not close after save: ${JSON.stringify(debug)}`);
   }
+  const purchaseItemText = await page.locator("#purchaseItems").innerText();
 
   await page.getByRole("button", { name: "Lista", exact: true }).click();
   await page.getByPlaceholder("Mayonesa, fideos, limpiador...").fill("Mayonesa");
@@ -318,6 +319,7 @@ async function run() {
   await page.locator("#stockMinInput").fill("2");
   await page.getByRole("button", { name: "Guardar" }).click();
   await page.waitForFunction(() => document.querySelector("#lowStockPanel:not([hidden])")?.textContent.includes("Leche"), null, { timeout: 5000 });
+  const stockText = await page.locator("#stockList").innerText();
   const lowStockText = await page.locator("#lowStockPanel").innerText();
   await page.locator("#addLowStockToListButton").click();
   await page.getByRole("button", { name: "Lista", exact: true }).click();
@@ -392,6 +394,7 @@ async function run() {
     appTitle: bodyText.includes("Control de Stock"),
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
+    categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Almacen") && stockText.includes("Lacteos"),
     listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
     lowStockVisible: lowStockText.includes("Para reponer") && lowStockText.includes("Leche") && lowStockText.includes("Minimo"),
     restockListAdded: restockListText.includes("Leche") && restockListText.includes("Escanear codigo"),
