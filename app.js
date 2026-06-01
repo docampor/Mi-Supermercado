@@ -290,6 +290,7 @@ function bindEvents() {
   $("#stockForm").addEventListener("submit", saveStockFromForm);
   $("#scanStockButton").addEventListener("click", scanForStock);
   $("#enableStockAlertsButton").addEventListener("click", enableStockAlerts);
+  $("#addLowStockToListButton").addEventListener("click", addLowStockToList);
   $("#exportButton").addEventListener("click", exportExcel);
   $("#exportBackupButton").addEventListener("click", exportBackup);
   $("#importBackupButton").addEventListener("click", () => els.backupFileInput.click());
@@ -1401,17 +1402,31 @@ function addShoppingListItem(event) {
   const qtyInput = $("#listQtyInput");
   const name = nameInput.value.trim();
   if (!name) return;
-  state.shoppingList.unshift({
-    id: uid("list"),
-    name,
-    quantity: qtyInput.value.trim(),
-    checked: false,
-    createdAt: new Date().toISOString()
-  });
+  addShoppingListEntry(name, qtyInput.value.trim());
   nameInput.value = "";
   qtyInput.value = "";
   saveState();
   renderShoppingList();
+}
+
+function addShoppingListEntry(name, quantity = "") {
+  const normalized = normalize(name);
+  const existing = state.shoppingList.find((item) => normalize(item.name) === normalized);
+  if (existing) {
+    existing.quantity = existing.quantity || String(quantity || "");
+    existing.updatedAt = new Date().toISOString();
+    return existing;
+  }
+
+  const item = {
+    id: uid("list"),
+    name,
+    quantity: String(quantity || ""),
+    checked: false,
+    createdAt: new Date().toISOString()
+  };
+  state.shoppingList.unshift(item);
+  return item;
 }
 
 function renderShoppingList() {
@@ -1429,10 +1444,10 @@ function renderShoppingList() {
         </div>
       </div>
       <div class="card-actions">
-        <button class="primary small" onclick="scanForPurchase('${item.id}')">Escanear codigo</button>
-        <button class="secondary small" onclick="sendListItemToPurchase('${item.id}')">Cargar sin escanear</button>
-        <button class="secondary small" onclick="editListItem('${item.id}')">Editar</button>
-        <button class="danger small" onclick="deleteListItem('${item.id}')">Eliminar</button>
+        <button class="primary small" onclick="scanForPurchase('${item.id}')">${svgIcon("scan")} Escanear codigo</button>
+        <button class="secondary small" onclick="sendListItemToPurchase('${item.id}')">${svgIcon("cart")} Cargar sin escanear</button>
+        <button class="secondary small" onclick="editListItem('${item.id}')">${svgIcon("edit")} Editar</button>
+        <button class="danger small" onclick="deleteListItem('${item.id}')">${svgIcon("trash")} Eliminar</button>
       </div>
     </article>
   `).join("");
@@ -1553,9 +1568,10 @@ function renderStock() {
         <div class="price">${formatNumber(item.quantity)}</div>
       </div>
       <div class="card-actions">
-        <button class="secondary small" onclick="changeStock('${item.id}', 1)">+1</button>
-        <button class="secondary small" onclick="changeStock('${item.id}', -1)">-1</button>
-        <button class="danger small" onclick="deleteStock('${item.id}')">Eliminar</button>
+        <button class="secondary small" onclick="changeStock('${item.id}', 1)">${svgIcon("plus")} +1</button>
+        <button class="secondary small" onclick="changeStock('${item.id}', -1)">${svgIcon("minus")} -1</button>
+        <button class="secondary small" onclick="addStockItemToList('${item.id}')">${svgIcon("cart")} A lista</button>
+        <button class="danger small" onclick="deleteStock('${item.id}')">${svgIcon("trash")} Eliminar</button>
       </div>
     </article>
   `).join("");
@@ -1597,8 +1613,37 @@ function renderLowStock() {
         </div>
         <span class="stock-badge">Reponer</span>
       </div>
+      <div class="card-actions">
+        <button class="primary small" onclick="addStockItemToList('${item.id}')">${svgIcon("cart")} Agregar a lista</button>
+      </div>
     </article>
   `).join("");
+}
+
+function addLowStockToList() {
+  const lowStockItems = state.stock.filter(isLowStock);
+  if (!lowStockItems.length) {
+    toast("No hay productos para reponer.");
+    return;
+  }
+
+  lowStockItems.forEach((item) => addShoppingListEntry(item.name, suggestedRestockQuantity(item)));
+  saveState();
+  renderShoppingList();
+  toast("Faltantes agregados a la lista.");
+}
+
+function addStockItemToList(itemId) {
+  const item = state.stock.find((entry) => entry.id === itemId);
+  if (!item) return;
+  addShoppingListEntry(item.name, suggestedRestockQuantity(item));
+  saveState();
+  renderShoppingList();
+  toast("Producto agregado a la lista.");
+}
+
+function suggestedRestockQuantity(item) {
+  return Math.max(1, Math.ceil(getMinStock(item) - Number(item.quantity || 0)));
 }
 
 function isLowStock(item) {
@@ -1918,7 +1963,7 @@ function registerServiceWorker() {
 }
 
 function metric(value, label) {
-  return `<div class="metric"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`;
+  return `<div class="metric"><span class="metric-icon">${svgIcon("tag")}</span><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`;
 }
 
 function emptyState(text) {
@@ -1928,6 +1973,10 @@ function emptyState(text) {
 function productImage(url, name) {
   if (!url) return "";
   return `<img class="product-thumb" src="${escapeHtml(url)}" alt="${escapeHtml(name)}" loading="lazy">`;
+}
+
+function svgIcon(name) {
+  return `<svg class="icon" aria-hidden="true"><use href="#icon-${escapeHtml(name)}"></use></svg>`;
 }
 
 function toast(message) {
@@ -1992,5 +2041,6 @@ window.sendListItemToPurchase = sendListItemToPurchase;
 window.editListItem = editListItem;
 window.deleteListItem = deleteListItem;
 window.changeStock = changeStock;
+window.addStockItemToList = addStockItemToList;
 window.deleteStock = deleteStock;
 window.fillProductFromBarcode = fillProductFromBarcode;

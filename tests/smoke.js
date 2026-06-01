@@ -239,7 +239,7 @@ async function run() {
     throw new Error(`Dialog did not close after save: ${JSON.stringify(debug)}`);
   }
 
-  await page.getByRole("button", { name: "Lista" }).click();
+  await page.getByRole("button", { name: "Lista", exact: true }).click();
   await page.getByPlaceholder("Mayonesa, fideos, limpiador...").fill("Mayonesa");
   await page.locator("#listQtyInput").fill("1");
   await page.getByRole("button", { name: "Agregar" }).click();
@@ -305,6 +305,7 @@ async function run() {
   }
   const brandDatabaseText = await page.locator("#productLookupInfo").innerText();
   await page.locator("#closeProductButton").click();
+  await page.locator("#productDialog").waitFor({ state: "hidden", timeout: 5000 });
 
   await page.getByRole("button", { name: "Stock" }).click();
   await page.locator("#stockNameInput").fill("Arroz");
@@ -316,6 +317,10 @@ async function run() {
   await page.getByRole("button", { name: "Guardar" }).click();
   await page.waitForFunction(() => document.querySelector("#lowStockPanel:not([hidden])")?.textContent.includes("Leche"), null, { timeout: 5000 });
   const lowStockText = await page.locator("#lowStockPanel").innerText();
+  await page.locator("#addLowStockToListButton").click();
+  await page.getByRole("button", { name: "Lista", exact: true }).click();
+  await page.waitForFunction(() => document.querySelector("#shoppingList")?.textContent.includes("Leche"), null, { timeout: 5000 });
+  const restockListText = await page.locator("#shoppingList").innerText();
 
   await page.getByRole("button", { name: "Informes" }).click();
   await page.waitForTimeout(300);
@@ -372,6 +377,7 @@ async function run() {
     purchaseSaved: bodyText.includes("Salsa lista"),
     listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
     lowStockVisible: lowStockText.includes("Para reponer") && lowStockText.includes("Leche") && lowStockText.includes("Minimo"),
+    restockListAdded: restockListText.includes("Leche") && restockListText.includes("Escanear codigo"),
     backupExported: backupFilename.endsWith(".json") && backupFilename.includes("control-stock-backup"),
     backupImported: importedState.shoppingList.some((item) => item.name === "Cafe importado") &&
       importedState.stock.some((item) => item.name === "Yerba importada"),
