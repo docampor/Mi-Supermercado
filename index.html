@@ -195,7 +195,7 @@
             <p class="eyebrow" id="productDialogMode">Producto</p>
             <h2>Cargar compra</h2>
           </div>
-          <button class="icon-button" value="cancel" type="button" id="closeProductButton" aria-label="Cerrar" title="Cerrar">
+          <button class="icon-button" value="cancel" type="button" id="closeProductButton" onclick="closeProductDialog()" aria-label="Cerrar" title="Cerrar">
             <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
           </button>
         </div>
@@ -244,7 +244,7 @@
 
         <div class="total-preview" id="productTotalPreview">$ 0,00</div>
         <menu class="dialog-actions">
-          <button class="secondary" value="cancel" type="button" id="cancelProductButton">Cancelar</button>
+          <button class="secondary" value="cancel" type="button" id="cancelProductButton" onclick="closeProductDialog()">Cancelar</button>
           <button class="primary" type="submit">Guardar</button>
         </menu>
       </form>
@@ -266,6 +266,17 @@
           <div class="scan-line" aria-hidden="true"></div>
         </div>
         <p class="hint" id="scannerMessage">Apunta al codigo de barras del producto.</p>
+        <div class="scanner-result" id="scannerResult" hidden></div>
+        <div class="scanner-confirm" id="scannerConfirmActions" hidden>
+          <button class="primary" type="button" id="confirmScanButton">
+            <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+            OK
+          </button>
+          <button class="danger" type="button" id="rejectScanButton">
+            <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
+            No es
+          </button>
+        </div>
         <form class="manual-code" id="manualBarcodeForm">
           <input id="manualBarcodeInput" autocomplete="off" inputmode="numeric" placeholder="Ingresar codigo manualmente">
           <button class="secondary" type="submit">Usar codigo</button>

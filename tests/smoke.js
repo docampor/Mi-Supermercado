@@ -252,12 +252,14 @@ async function run() {
   await page.waitForFunction(() => document.querySelector("#productNameInput").value.includes("Raid"), null, { timeout: 5000 });
   const fallbackImageSrc = await page.locator(".lookup-image").getAttribute("src");
   await page.locator("#closeProductButton").click();
+  await page.locator("#productDialog").waitFor({ state: "hidden", timeout: 5000 });
 
   await page.getByRole("button", { name: "Cargar manual" }).click();
   await page.locator("#barcodeInput").fill(catalogBarcode);
   await page.evaluate(() => window.fillProductFromBarcode(true));
   await page.waitForFunction(() => document.querySelector("#productNameInput").value.includes("Magistral"), null, { timeout: 5000 });
   const catalogImageSrc = await page.locator(".lookup-image").getAttribute("src");
+  const catalogLookupText = await page.locator("#productLookupInfo").innerText();
   const catalogPriceText = await page.locator(".price-reference").innerText();
   await page.locator("#closeProductButton").click();
 
@@ -304,7 +306,7 @@ async function run() {
     throw new Error(await page.locator("#productLookupInfo").innerText());
   }
   const brandDatabaseText = await page.locator("#productLookupInfo").innerText();
-  await page.locator("#closeProductButton").click();
+  await page.evaluate(() => window.closeProductDialog());
   await page.locator("#productDialog").waitFor({ state: "hidden", timeout: 5000 });
 
   await page.getByRole("button", { name: "Stock" }).click();
@@ -383,12 +385,14 @@ async function run() {
       importedState.stock.some((item) => item.name === "Yerba importada"),
     scannerUsesRetailFormatsOnly: await page.evaluate(() => {
       const source = window.openScanner.toString();
-      return source.includes("ean_13") && source.includes("upc_a") && !source.includes("code_128") && !source.includes("code_39");
+      return source.includes("ean_13") && source.includes("upc_a") && !source.includes("code_128") && !source.includes("code_39") &&
+        Boolean(document.querySelector("#scannerResult")) && Boolean(document.querySelector("#scannerConfirmActions"));
     }),
     lookupImageVisible: Boolean(lookupImageSrc),
     goUpcSourceVisible: lookupImageSrc.includes("go-upc"),
     fallbackImageVisible: Boolean(fallbackImageSrc),
     catalogImageVisible: Boolean(catalogImageSrc),
+    catalogDataNotStale: catalogLookupText.includes("Magistral") && !catalogLookupText.includes("Raid"),
     priceReferenceVisible: catalogPriceText.includes("SEPA") && catalogPriceText.includes("Precios Claros") && catalogPriceText.includes("$"),
     sepaDatasetVisible: brandDatabaseText.includes("SEPA") || catalogPriceText.includes("SEPA"),
     newCatalogProductsVisible: newCatalogResults.every((item) => item.image && item.price),

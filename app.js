@@ -15,6 +15,9 @@ let scannerLoop = 0;
 let scannerCandidateCode = "";
 let scannerCandidateCount = 0;
 let scannerCandidateAt = 0;
+let scannerConfirmedCode = "";
+let scannerConfirmedProduct = null;
+let scannerDetectingPaused = false;
 let stockAlertNotifiedKeys = new Set();
 let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
@@ -263,6 +266,8 @@ const els = {
   scannerDialog: $("#scannerDialog"),
   scannerVideo: $("#scannerVideo"),
   scannerMessage: $("#scannerMessage"),
+  scannerResult: $("#scannerResult"),
+  scannerConfirmActions: $("#scannerConfirmActions"),
   manualBarcodeInput: $("#manualBarcodeInput")
 };
 
@@ -297,6 +302,8 @@ function bindEvents() {
   els.backupFileInput.addEventListener("change", importBackup);
   $("#manualBarcodeForm").addEventListener("submit", submitManualBarcode);
   $("#closeScannerButton").addEventListener("click", closeScanner);
+  $("#confirmScanButton").addEventListener("click", confirmDetectedScan);
+  $("#rejectScanButton").addEventListener("click", rejectDetectedScan);
   $("#closeProductButton").addEventListener("click", () => els.productDialog.close());
   $("#cancelProductButton").addEventListener("click", () => els.productDialog.close());
   els.productForm.addEventListener("submit", saveProductEntry);
@@ -484,8 +491,8 @@ function renderPurchase() {
 
 function scanForPurchase(listItemId = null) {
   pendingListItemId = listItemId;
-  openScanner(async (barcode) => {
-    const product = await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
+  openScanner(async (barcode, scannedProduct = null) => {
+    const product = scannedProduct || await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
     const listItem = pendingListItemId ? state.shoppingList.find((item) => item.id === pendingListItemId) : null;
     openProductDialog({
       context: "purchase",
@@ -526,6 +533,10 @@ function queueBarcodeLookup() {
   const barcode = els.barcodeInput.value.trim();
   if (barcode.length < 8) return;
   barcodeLookupTimer = setTimeout(fillProductFromBarcode, 450);
+}
+
+function closeProductDialog() {
+  if (els.productDialog.open) els.productDialog.close();
 }
 
 function editPurchaseItem(itemId) {
@@ -807,6 +818,7 @@ function extractQuantityLabel(name) {
 function mergeProductData(baseProduct, newProduct) {
   if (!baseProduct) return newProduct;
   if (!newProduct) return baseProduct;
+  if (baseProduct.barcode && newProduct.barcode && baseProduct.barcode !== newProduct.barcode) return newProduct;
   const mergedName = chooseBetterName(baseProduct.name, newProduct.name);
   return {
     ...baseProduct,
@@ -816,7 +828,7 @@ function mergeProductData(baseProduct, newProduct) {
     metadata: enrichMetadataWithBrand(mergedName, {
       ...(baseProduct.metadata || {}),
       ...(newProduct.metadata || {}),
-      imageUrl: baseProduct.metadata?.imageUrl || newProduct.metadata?.imageUrl || ""
+      imageUrl: newProduct.metadata?.imageUrl || baseProduct.metadata?.imageUrl || ""
     })
   };
 }
@@ -1254,10 +1266,11 @@ function findFirstImageUrl(value) {
 
 async function fillProductFromBarcode(force = false) {
   clearTimeout(barcodeLookupTimer);
-  const barcode = els.barcodeInput.value.trim();
+  const barcode = normalizeBarcodeValue(els.barcodeInput.value);
+  els.barcodeInput.value = barcode;
   if (!barcode || (!force && els.productNameInput.value.trim())) return;
   renderLookupInfo({
-    name: els.productNameInput.value.trim() || "Buscando producto...",
+    name: "Buscando producto...",
     metadata: { source: "consulta online" },
     loading: true
   });
@@ -1501,8 +1514,8 @@ function saveStockFromForm(event) {
 }
 
 function scanForStock() {
-  openScanner(async (barcode) => {
-    const product = await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
+  openScanner(async (barcode, scannedProduct = null) => {
+    const product = scannedProduct || await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
     openProductDialog({
       context: "stock",
       barcode,
@@ -1747,6 +1760,7 @@ async function openScanner(callback) {
   scannerCallback = callback;
   els.manualBarcodeInput.value = "";
   resetScannerCandidate();
+  clearScannerResult();
   els.scannerMessage.textContent = "Apunta al codigo de barras del producto.";
   els.scannerDialog.showModal();
 
@@ -1758,7 +1772,12 @@ async function openScanner(callback) {
 
   try {
     scannerStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        focusMode: { ideal: "continuous" }
+      },
       audio: false
     });
     els.scannerVideo.srcObject = scannerStream;
@@ -1775,6 +1794,11 @@ async function openScanner(callback) {
 
 async function scanFrame(detector) {
   if (!scannerStream) return;
+  if (scannerDetectingPaused) {
+    scannerLoop = requestAnimationFrame(() => scanFrame(detector));
+    return;
+  }
+
   try {
     const codes = await detector.detect(els.scannerVideo);
     if (codes.length) {
@@ -1782,8 +1806,7 @@ async function scanFrame(detector) {
       if (!isRetailBarcode(code)) {
         els.scannerMessage.textContent = "Esa lectura no parece un codigo de supermercado. Ajusta el enfoque o cargalo manualmente.";
       } else if (confirmScannerCandidate(code)) {
-        finishScan(code);
-        return;
+        await previewDetectedScan(code);
       } else {
         els.scannerMessage.textContent = `Lei ${code}. Mantenelo quieto un segundo para confirmarlo.`;
       }
@@ -1797,19 +1820,43 @@ async function scanFrame(detector) {
 function submitManualBarcode(event) {
   event.preventDefault();
   const code = normalizeBarcodeValue(els.manualBarcodeInput.value);
-  if (code) finishScan(code);
+  if (code) previewDetectedScan(code);
 }
 
-function finishScan(code) {
+async function previewDetectedScan(code) {
+  scannerDetectingPaused = true;
+  scannerConfirmedCode = normalizeBarcodeValue(code);
+  scannerConfirmedProduct = null;
+  els.scannerMessage.textContent = `Buscando datos de ${scannerConfirmedCode}...`;
+  showScannerCandidate({ barcode: scannerConfirmedCode, name: "Buscando producto...", loading: true, metadata: {} });
+
+  const product = await resolveBarcodeProduct(scannerConfirmedCode, { refreshMissingImage: true });
+  if (!els.scannerDialog.open || scannerConfirmedCode !== code) return;
+  scannerConfirmedProduct = product?.name ? product : null;
+  showScannerCandidate(product || { barcode: scannerConfirmedCode, name: "", source: "missing", metadata: {} });
+  els.scannerMessage.textContent = product?.name
+    ? "Confirma si este es el producto correcto."
+    : "No encontre datos. Si el codigo es correcto, podes aceptarlo y cargarlo manualmente.";
+}
+
+function confirmDetectedScan() {
+  if (!scannerConfirmedCode) return;
   const callback = scannerCallback;
   closeScanner();
-  if (callback) callback(normalizeBarcodeValue(code));
+  if (callback) callback(scannerConfirmedCode, scannerConfirmedProduct);
+}
+
+function rejectDetectedScan() {
+  clearScannerResult();
+  resetScannerCandidate();
+  els.scannerMessage.textContent = "Ok, segui apuntando al codigo correcto.";
 }
 
 function closeScanner() {
   if (scannerLoop) cancelAnimationFrame(scannerLoop);
   scannerLoop = 0;
   resetScannerCandidate();
+  clearScannerResult();
   if (scannerStream) {
     scannerStream.getTracks().forEach((track) => track.stop());
     scannerStream = null;
@@ -1818,12 +1865,59 @@ function closeScanner() {
   if (els.scannerDialog.open) els.scannerDialog.close();
 }
 
+function showScannerCandidate(product) {
+  const metadata = product?.metadata || {};
+  const details = [
+    metadata.brand ? `Marca: ${metadata.brand}` : "",
+    metadata.quantityLabel ? `Presentacion: ${metadata.quantityLabel}` : "",
+    metadata.category ? `Categoria: ${metadata.category}` : ""
+  ].filter(Boolean);
+
+  els.scannerResult.hidden = false;
+  els.scannerConfirmActions.hidden = false;
+  els.scannerResult.innerHTML = `
+    ${metadata.imageUrl ? `<img class="lookup-image" src="${escapeHtml(metadata.imageUrl)}" alt="${escapeHtml(product.name || "Producto")}">` : `<div class="lookup-image placeholder">Sin foto</div>`}
+    <div class="lookup-copy">
+      <strong>${escapeHtml(product.name || "Producto no identificado")}</strong>
+      <small>Codigo: ${escapeHtml(product.barcode || scannerConfirmedCode)}</small>
+      ${details.length ? `<small>${escapeHtml(details.join(" | "))}</small>` : ""}
+      ${product.loading ? "<small>Consultando bases de productos...</small>" : ""}
+    </div>
+  `;
+}
+
+function clearScannerResult() {
+  scannerConfirmedCode = "";
+  scannerConfirmedProduct = null;
+  scannerDetectingPaused = false;
+  if (els.scannerResult) {
+    els.scannerResult.hidden = true;
+    els.scannerResult.innerHTML = "";
+  }
+  if (els.scannerConfirmActions) els.scannerConfirmActions.hidden = true;
+}
+
 function normalizeBarcodeValue(code) {
   return String(code || "").replace(/\D/g, "").trim();
 }
 
 function isRetailBarcode(code) {
-  return /^(\d{8}|\d{12,14})$/.test(code);
+  if (!/^(\d{8}|\d{12,14})$/.test(code)) return false;
+  if (code.length === 8 || code.length === 12 || code.length === 13) return hasValidBarcodeChecksum(code);
+  return true;
+}
+
+function hasValidBarcodeChecksum(code) {
+  const digits = String(code).split("").map(Number);
+  const check = digits.pop();
+  const weightFromRight = code.length === 8 || code.length === 12;
+  const sum = digits.reduce((total, digit, index) => {
+    const weight = weightFromRight
+      ? ((digits.length - index) % 2 === 1 ? 3 : 1)
+      : (index % 2 === 0 ? 1 : 3);
+    return total + digit * weight;
+  }, 0);
+  return (10 - (sum % 10)) % 10 === check;
 }
 
 function confirmScannerCandidate(code) {
@@ -1835,7 +1929,7 @@ function confirmScannerCandidate(code) {
     scannerCandidateCount = 1;
   }
   scannerCandidateAt = now;
-  return scannerCandidateCount >= 2;
+  return scannerCandidateCount >= 3;
 }
 
 function resetScannerCandidate() {
@@ -2038,6 +2132,7 @@ window.editPurchaseItem = editPurchaseItem;
 window.removePurchaseItem = removePurchaseItem;
 window.scanForPurchase = scanForPurchase;
 window.sendListItemToPurchase = sendListItemToPurchase;
+window.closeProductDialog = closeProductDialog;
 window.editListItem = editListItem;
 window.deleteListItem = deleteListItem;
 window.changeStock = changeStock;
