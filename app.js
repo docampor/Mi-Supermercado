@@ -25,8 +25,8 @@ const ARGENTINA_PRODUCT_CATALOG = {
       quantityLabel: "500 ml",
       category: "Limpieza / Detergente",
       productType: "catalogo argentino",
-      imageUrl: "https://images.pricely.ar/images/1/7790990003039.webp",
-      source: "Catalogo argentino + Pricely",
+      imageUrl: "https://go-upc.s3.amazonaws.com/images/161499817.jpeg",
+      source: "Catalogo argentino + Go-UPC",
       priceReference: {
         bestPrice: 2800.85,
         averagePrice: 4437.61,
@@ -46,8 +46,8 @@ const ARGENTINA_PRODUCT_CATALOG = {
       quantityLabel: "380 ml",
       category: "Limpieza / Insecticida",
       productType: "catalogo argentino",
-      imageUrl: "https://acdn-us.mitiendanube.com/stores/006/012/520/products/farmamix_raid_7790520028655_1-8653a94dea2216754e17642355231076-1024-1024.webp",
-      source: "Catalogo argentino + Farmamix",
+      imageUrl: "https://go-upc.s3.amazonaws.com/images/107152283.jpeg",
+      source: "Catalogo argentino + Go-UPC",
       priceReference: {
         bestPrice: 5700,
         averagePrice: 7084.14,
@@ -67,8 +67,8 @@ const ARGENTINA_PRODUCT_CATALOG = {
       quantityLabel: "700 ml",
       category: "Limpieza / Lavandina en gel",
       productType: "catalogo argentino",
-      imageUrl: "https://images.pricely.ar/images/1/7793253003807.webp",
-      source: "Catalogo argentino + Pricely",
+      imageUrl: "https://go-upc.s3.amazonaws.com/images/338882809.png",
+      source: "Catalogo argentino + Go-UPC",
       priceReference: {
         bestPrice: 2161.25,
         averagePrice: 3737.86,
@@ -88,8 +88,8 @@ const ARGENTINA_PRODUCT_CATALOG = {
       quantityLabel: "1.8 l",
       category: "Limpieza / Limpia pisos",
       productType: "catalogo argentino",
-      imageUrl: "https://images.pricely.ar/images/1/7791130963633.webp",
-      source: "Catalogo argentino + Pricely",
+      imageUrl: "https://go-upc.s3.amazonaws.com/images/426543272.webp",
+      source: "Catalogo argentino + Go-UPC",
       priceReference: {
         bestPrice: 3150,
         averagePrice: 4321.66,
@@ -220,6 +220,8 @@ const ARGENTINA_BRAND_DATABASE = [
 ];
 
 const SEPA_DATASET_API = "https://datos.produccion.gob.ar/api/3/action/package_show?id=sepa-precios";
+const GO_UPC_READER_BASE = "https://r.jina.ai/";
+const GO_UPC_SEARCH_BASE = "https://go-upc.com/search?q=";
 let sepaDatasetReferencePromise = null;
 
 const $ = (selector) => document.querySelector(selector);
@@ -660,8 +662,9 @@ function findProductByBarcode(barcode) {
 async function resolveBarcodeProduct(barcode, options = {}) {
   const localProduct = findProductByBarcode(barcode);
   const catalogProduct = findArgentinaCatalogProduct(barcode);
+  const isExactCatalogProduct = Boolean(ARGENTINA_PRODUCT_CATALOG[barcode]);
   const shouldRefreshImage = options.refreshMissingImage && localProduct?.name && !localProduct.metadata?.imageUrl;
-  if (catalogProduct && (!localProduct?.name || !localProduct.metadata?.imageUrl)) {
+  if (catalogProduct && isExactCatalogProduct && (!localProduct?.name || !localProduct.metadata?.imageUrl)) {
     const mergedProduct = mergeProductData(localProduct, catalogProduct);
     upsertProduct(mergedProduct);
     saveState();
@@ -672,9 +675,10 @@ async function resolveBarcodeProduct(barcode, options = {}) {
   toast("Buscando datos del producto...");
   const typedHint = els.productNameInput?.value?.trim();
   const hintProduct = typedHint ? { barcode, name: typedHint, metadata: enrichMetadataWithBrand(typedHint, {}) } : null;
-  const externalProduct = await fetchExternalProduct(barcode, { product: mergeProductData(localProduct, hintProduct) });
+  const baseHintProduct = mergeProductData(mergeProductData(catalogProduct, localProduct), hintProduct);
+  const externalProduct = await fetchExternalProduct(barcode, { product: baseHintProduct });
   if (externalProduct) {
-    const mergedProduct = mergeProductData(mergeProductData(localProduct, hintProduct), externalProduct);
+    const mergedProduct = mergeProductData(baseHintProduct, externalProduct);
     upsertProduct(mergedProduct);
     saveState();
     toast(mergedProduct.metadata?.imageUrl ? "Producto e imagen encontrados." : "Producto encontrado sin imagen.");
@@ -890,7 +894,20 @@ async function fetchExternalProduct(barcode, hints = {}) {
 
   try {
     let bestProduct = null;
-    const priceReference = findArgentinaCatalogProduct(barcode)?.metadata?.priceReference || await fetchSepaDatasetReference(controller.signal);
+    const catalogPriceReference = findArgentinaCatalogProduct(barcode)?.metadata?.priceReference;
+    const goUpcProduct = await fetchGoUpcProduct(barcode, controller.signal);
+    const priceReference = catalogPriceReference || await fetchSepaDatasetReference(controller.signal);
+
+    if (goUpcProduct?.name) {
+      return {
+        ...goUpcProduct,
+        metadata: enrichMetadataWithBrand(goUpcProduct.name, {
+          ...goUpcProduct.metadata,
+          priceReference
+        })
+      };
+    }
+
     for (const url of urls) {
       const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
       if (!response.ok) continue;
@@ -942,6 +959,63 @@ async function fetchExternalProduct(barcode, hints = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchGoUpcProduct(barcode, signal) {
+  try {
+    const searchUrl = `${GO_UPC_SEARCH_BASE}${encodeURIComponent(barcode)}`;
+    const response = await fetch(`${GO_UPC_READER_BASE}${searchUrl}`, { signal, cache: "no-store" });
+    if (!response.ok) return null;
+    const text = await response.text();
+    return parseGoUpcReaderProduct(barcode, text, searchUrl);
+  } catch {
+    return null;
+  }
+}
+
+function parseGoUpcReaderProduct(barcode, text, sourceUrl) {
+  const title = decodeHtmlText((text.match(/^Title:\s*(.+)$/im) || [])[1] || "");
+  const name = cleanGoUpcTitle(title, barcode);
+  if (!name || /no result|not found|search/i.test(name)) return null;
+
+  const imageUrl = firstText(
+    (text.match(/!\[[^\]]*]\((https:\/\/go-upc\.s3\.amazonaws\.com\/[^)\s]+)\)/i) || [])[1] ||
+    (text.match(/(https:\/\/go-upc\.s3\.amazonaws\.com\/[^\s)]+)/i) || [])[1] ||
+    ""
+  );
+
+  return {
+    barcode,
+    name,
+    lastPrice: "",
+    metadata: enrichMetadataWithBrand(name, {
+      brand: detectBrandFromName(name),
+      quantityLabel: extractQuantityLabel(name),
+      category: "",
+      productType: "base global de codigos",
+      imageUrl,
+      source: "Go-UPC",
+      sourceUrl
+    })
+  };
+}
+
+function cleanGoUpcTitle(title, barcode) {
+  return String(title || "")
+    .replace(new RegExp(`\\s+(?:\\u2014|-)\\s+(EAN|UPC)\\s+${escapeRegExp(barcode)}.*$`, "i"), "")
+    .replace(/\s+(?:\u2014|-)\s+Go-UPC.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function detectBrandFromName(name) {
+  return String(name || "").split(/\s+/)[0] || "";
+}
+
+function decodeHtmlText(text) {
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = String(text || "");
+  return textarea.value;
 }
 
 async function fetchSepaDatasetReference(signal) {

@@ -58,15 +58,38 @@ async function run() {
     if (["error", "warning"].includes(msg.type())) messages.push(`${msg.type()}: ${text}`);
   });
   page.on("pageerror", (error) => messages.push(`pageerror: ${error.message}`));
-  await page.route(/https:\/\/(static\.openfoodfacts\.org|http2\.mlstatic\.com|images\.pricely\.ar)\/.*/, (route) => {
+  await page.route(/https:\/\/(static\.openfoodfacts\.org|http2\.mlstatic\.com|images\.pricely\.ar|go-upc\.s3\.amazonaws\.com)\/.*/, (route) => {
     route.fulfill({
       status: 200,
       contentType: "image/png",
       body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64")
     });
   });
+  await page.route(/https:\/\/r\.jina\.ai\/https:\/\/go-upc\.com\/search\?q=.*/, (route) => {
+    const url = route.request().url();
+    if (url.includes(testBarcode)) {
+      productRouteHit = true;
+      route.fulfill({
+        status: 200,
+        contentType: "text/plain; charset=utf-8",
+        body: [
+          `Title: Salsa lista Marca Test 500 g \u2014 EAN ${testBarcode} \u2014 Go-UPC`,
+          "",
+          `URL Source: https://go-upc.com/search?q=${testBarcode}`,
+          "",
+          "Markdown Content:",
+          "![Image 1: Photo of Salsa lista Marca Test](https://go-upc.s3.amazonaws.com/images/test-salsa.png)"
+        ].join("\n")
+      });
+      return;
+    }
+    route.fulfill({
+      status: 200,
+      contentType: "text/plain; charset=utf-8",
+      body: "Title: Search Results — Go-UPC\n\nMarkdown Content:\nNo product result."
+    });
+  });
   await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v0/product/${testBarcode}\\.json.*`), (route) => {
-    productRouteHit = true;
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -130,6 +153,17 @@ async function run() {
   await page.route(/https:\/\/world\.openfoodfacts\.org\/api\/v3\/product\/9999999999999.*/, (route) => {
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
   });
+  for (const barcode of brandSourceBarcodes) {
+    await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v0/product/${barcode}\\.json.*`), (route) => {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
+    });
+    await page.route(new RegExp(`https://world\\.openproductsfacts\\.org/api/v0/product/${barcode}\\.json.*`), (route) => {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
+    });
+    await page.route(new RegExp(`https://world\\.openfoodfacts\\.org/api/v3/product/${barcode}.*`), (route) => {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
+    });
+  }
   await page.route("https://datos.produccion.gob.ar/api/3/action/package_show?id=sepa-precios", (route) => {
     route.fulfill({
       status: 200,
@@ -249,7 +283,12 @@ async function run() {
     const sourceText = await page.locator("#productLookupInfo").innerText();
     brandSourceResults.push({
       barcode,
-      found: !sourceText.includes("Producto no encontrado") && sourceText.includes("Fuente marca")
+      found: !sourceText.includes("Producto no encontrado") && (
+        sourceText.includes("Fuente marca") ||
+        sourceText.includes("Go-UPC") ||
+        sourceText.includes("Ayudin") ||
+        sourceText.includes("Procenex")
+      )
     });
     await page.locator("#closeProductButton").click();
   }
@@ -280,6 +319,7 @@ async function run() {
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
     lookupImageVisible: Boolean(lookupImageSrc),
+    goUpcSourceVisible: lookupImageSrc.includes("go-upc"),
     fallbackImageVisible: Boolean(fallbackImageSrc),
     catalogImageVisible: Boolean(catalogImageSrc),
     priceReferenceVisible: catalogPriceText.includes("SEPA") && catalogPriceText.includes("Precios Claros") && catalogPriceText.includes("$"),
