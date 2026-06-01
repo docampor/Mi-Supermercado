@@ -206,6 +206,11 @@ async function run() {
   const bottomNavCount = await page.locator(".bottom-nav .nav-button").count();
   const moreButtonVisible = await page.locator("#topMoreButton").isVisible();
   const oldFloatingMoreCount = await page.locator("#moreButton").count();
+  await page.locator("#topMoreButton").click();
+  await page.waitForFunction(() => document.querySelector("#moreMenu")?.hidden === false, null, { timeout: 5000 });
+  const topMoreMenuOpened = await page.locator("#moreMenu").isVisible();
+  await page.locator("#topMoreButton").click();
+  await page.waitForFunction(() => document.querySelector("#moreMenu")?.hidden === true, null, { timeout: 5000 });
   await page.locator("#homeShopButton").click();
   await page.waitForFunction(() => document.querySelector("#view-shop")?.classList.contains("active"), null, { timeout: 5000 });
   await page.getByRole("button", { name: "Cargar manual" }).click();
@@ -400,10 +405,23 @@ async function run() {
   }, null, { timeout: 5000 });
   const importedState = await page.evaluate(() => JSON.parse(localStorage.getItem("control-stock-v1") || "{}"));
 
+  await page.evaluate(() => {
+    window.openScanner("purchase", () => {});
+    document.querySelector("#scannerQuantityBox").hidden = false;
+    document.querySelector("#scannerQtyInput").value = "1";
+  });
+  await page.locator("#increaseScanQtyButton").click();
+  const scanQtyAfterPlus = await page.locator("#scannerQtyInput").inputValue();
+  await page.locator("#decreaseScanQtyButton").click();
+  const scanQtyAfterMinus = await page.locator("#scannerQtyInput").inputValue();
+  await page.locator("#finishScannerButton").click();
+  await page.waitForFunction(() => document.querySelector("#scannerDialog")?.open === false, null, { timeout: 5000 });
+  const scannerFinishedByButton = await page.evaluate(() => document.querySelector("#scannerDialog")?.open === false);
+
   const checks = {
     appTitle: bodyText.includes("Control de Stock"),
     homeVisible: homeText.includes("Inicio") && homeText.includes("Ir de compras") && homeText.includes("Para mirar antes de salir"),
-    homeActionsWork: bottomNavCount === 4 && moreButtonVisible && oldFloatingMoreCount === 0,
+    homeActionsWork: bottomNavCount === 4 && moreButtonVisible && oldFloatingMoreCount === 0 && topMoreMenuOpened,
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
     categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Limpieza") && stockText.includes("Lacteos"),
@@ -438,8 +456,11 @@ async function run() {
         Boolean(document.querySelector("#finishScannerButton")) &&
         Boolean(document.querySelector("#scannerSessionSummary")) &&
         firstRead === false && secondRead === false && thirdRead === true &&
+        typeof window.closeScanner === "function" &&
+        typeof window.changeScannerQuantity === "function" &&
+        typeof window.rejectDetectedScan === "function" &&
         !confirmSource.includes("closeScanner()");
-    }),
+    }) && scanQtyAfterPlus === "2" && scanQtyAfterMinus === "1" && scannerFinishedByButton,
     lookupImageVisible: Boolean(lookupImageSrc),
     goUpcSourceVisible: lookupImageSrc.includes("go-upc"),
     fallbackImageVisible: Boolean(fallbackImageSrc),

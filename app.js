@@ -310,7 +310,6 @@ function bindEvents() {
   document.querySelectorAll(".nav-button").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.view));
   });
-  els.moreButton.addEventListener("click", toggleMoreMenu);
   document.addEventListener("click", (event) => {
     if (els.moreMenu.hidden) return;
     if (els.moreMenu.contains(event.target) || els.moreButton.contains(event.target)) return;
@@ -334,12 +333,6 @@ function bindEvents() {
   $("#shareStockButton").addEventListener("click", shareStockReport);
   $("#clearDataButton").addEventListener("click", clearAllData);
   $("#manualBarcodeForm").addEventListener("submit", submitManualBarcode);
-  $("#closeScannerButton").addEventListener("click", closeScanner);
-  $("#finishScannerButton").addEventListener("click", closeScanner);
-  $("#confirmScanButton").addEventListener("click", confirmDetectedScan);
-  $("#rejectScanButton").addEventListener("click", rejectDetectedScan);
-  $("#decreaseScanQtyButton").addEventListener("click", () => changeScannerQuantity(-1));
-  $("#increaseScanQtyButton").addEventListener("click", () => changeScannerQuantity(1));
   els.scannerQtyInput.addEventListener("input", () => {
     scannerQuantity = Math.max(0.01, parseNumber(els.scannerQtyInput.value) || 1);
   });
@@ -422,6 +415,7 @@ function render() {
 
 function showView(viewName) {
   els.moreMenu.hidden = true;
+  els.moreButton.setAttribute("aria-expanded", "false");
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   document.querySelector(`#view-${viewName}`).classList.add("active");
   document.querySelectorAll(".nav-button").forEach((button) => {
@@ -430,8 +424,11 @@ function showView(viewName) {
 }
 
 function toggleMoreMenu(event) {
+  event?.preventDefault?.();
   event?.stopPropagation();
-  els.moreMenu.hidden = !els.moreMenu.hidden;
+  const willOpen = els.moreMenu.hidden;
+  els.moreMenu.hidden = !willOpen;
+  els.moreButton.setAttribute("aria-expanded", String(willOpen));
 }
 
 function startHomePurchaseScan() {
@@ -2809,12 +2806,16 @@ function escapeHtml(value) {
 window.editPurchaseItem = editPurchaseItem;
 window.removePurchaseItem = removePurchaseItem;
 window.showView = showView;
+window.toggleMoreMenu = toggleMoreMenu;
 window.startHomePurchaseScan = startHomePurchaseScan;
 window.startHomeStockScan = startHomeStockScan;
 window.scanForPurchase = scanForPurchase;
 window.sendListItemToPurchase = sendListItemToPurchase;
 window.closeProductDialog = closeProductDialog;
+window.closeScanner = closeScanner;
 window.confirmDetectedScan = confirmDetectedScan;
+window.rejectDetectedScan = rejectDetectedScan;
+window.changeScannerQuantity = changeScannerQuantity;
 window.confirmScannerCandidate = confirmScannerCandidate;
 window.resetScannerCandidate = resetScannerCandidate;
 window.editListItem = editListItem;

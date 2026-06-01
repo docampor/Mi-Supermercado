@@ -39,7 +39,7 @@
           <p class="eyebrow">Supermercado local</p>
           <h1>Control de Stock</h1>
         </div>
-        <button class="icon-button top-more" id="topMoreButton" type="button" aria-label="Mas opciones" title="Mas opciones">
+        <button class="icon-button top-more" id="topMoreButton" type="button" onclick="toggleMoreMenu(event)" aria-label="Mas opciones" aria-expanded="false" title="Mas opciones">
           <svg class="icon" aria-hidden="true"><use href="#icon-more"></use></svg>
         </button>
       </header>
@@ -340,7 +340,7 @@
             <p class="eyebrow">Lector</p>
             <h2>Escanear codigo</h2>
           </div>
-          <button class="icon-button" id="closeScannerButton" aria-label="Cerrar" title="Cerrar">
+          <button class="icon-button" id="closeScannerButton" type="button" onclick="closeScanner()" aria-label="Cerrar" title="Cerrar">
             <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
           </button>
         </div>
@@ -352,23 +352,23 @@
         <p class="hint" id="scannerMessage">Apunta al codigo de barras del producto.</p>
         <div class="scanner-result" id="scannerResult" hidden></div>
         <div class="scanner-quantity" id="scannerQuantityBox" hidden>
-          <button class="secondary" type="button" id="decreaseScanQtyButton">
+          <button class="secondary" type="button" id="decreaseScanQtyButton" onclick="changeScannerQuantity(-1)">
             <svg class="icon" aria-hidden="true"><use href="#icon-minus"></use></svg>
           </button>
           <label>
             Cantidad
             <input id="scannerQtyInput" type="number" min="0.01" step="0.01" value="1">
           </label>
-          <button class="secondary" type="button" id="increaseScanQtyButton">
+          <button class="secondary" type="button" id="increaseScanQtyButton" onclick="changeScannerQuantity(1)">
             <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
           </button>
         </div>
         <div class="scanner-confirm" id="scannerConfirmActions" hidden>
-          <button class="primary" type="button" id="confirmScanButton">
+          <button class="primary" type="button" id="confirmScanButton" onclick="confirmDetectedScan()">
             <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
             OK
           </button>
-          <button class="danger" type="button" id="rejectScanButton">
+          <button class="danger" type="button" id="rejectScanButton" onclick="rejectDetectedScan()">
             <svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>
             No es
           </button>
@@ -377,7 +377,7 @@
           <input id="manualBarcodeInput" autocomplete="off" inputmode="numeric" placeholder="Ingresar codigo manualmente">
           <button class="secondary" type="submit">Usar codigo</button>
         </form>
-        <button class="secondary scanner-finish" type="button" id="finishScannerButton">
+        <button class="secondary scanner-finish" type="button" id="finishScannerButton" onclick="closeScanner()">
           Finalizar escaneo
         </button>
       </div>
