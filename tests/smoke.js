@@ -243,6 +243,7 @@ async function run() {
   await page.getByPlaceholder("Mayonesa, fideos, limpiador...").fill("Mayonesa");
   await page.locator("#listQtyInput").fill("1");
   await page.getByRole("button", { name: "Agregar" }).click();
+  const listActionText = await page.locator("#shoppingList").innerText();
 
   await page.getByRole("button", { name: "Compra", exact: true }).click();
   await page.getByRole("button", { name: "Cargar manual" }).click();
@@ -314,10 +315,59 @@ async function run() {
   await page.waitForTimeout(300);
 
   const bodyText = await page.locator("body").innerText();
+  const productThumbCountBeforeImport = await page.locator(".product-thumb").count();
+  const backupDownloadPromise = page.waitForEvent("download");
+  await page.locator("#exportBackupButton").click();
+  const backupDownload = await backupDownloadPromise;
+  const backupFilename = backupDownload.suggestedFilename();
+
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.locator("#backupFileInput").setInputFiles({
+    name: "control-stock-backup-test.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({
+      app: "control-stock",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: {
+        products: [],
+        purchases: [],
+        shoppingList: [
+          {
+            id: "list-imported",
+            name: "Cafe importado",
+            quantity: "2",
+            checked: false,
+            createdAt: new Date().toISOString()
+          }
+        ],
+        stock: [
+          {
+            id: "stock-imported",
+            name: "Yerba importada",
+            barcode: "",
+            quantity: 1,
+            updatedAt: new Date().toISOString()
+          }
+        ]
+      }
+    }))
+  });
+  await page.waitForFunction(() => {
+    const data = JSON.parse(localStorage.getItem("control-stock-v1") || "{}");
+    return data.shoppingList?.some((item) => item.name === "Cafe importado") &&
+      data.stock?.some((item) => item.name === "Yerba importada");
+  }, null, { timeout: 5000 });
+  const importedState = await page.evaluate(() => JSON.parse(localStorage.getItem("control-stock-v1") || "{}"));
+
   const checks = {
     appTitle: bodyText.includes("Control de Stock"),
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
+    listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
+    backupExported: backupFilename.endsWith(".json") && backupFilename.includes("control-stock-backup"),
+    backupImported: importedState.shoppingList.some((item) => item.name === "Cafe importado") &&
+      importedState.stock.some((item) => item.name === "Yerba importada"),
     scannerUsesRetailFormatsOnly: await page.evaluate(() => {
       const source = window.openScanner.toString();
       return source.includes("ean_13") && source.includes("upc_a") && !source.includes("code_128") && !source.includes("code_39");
@@ -331,7 +381,7 @@ async function run() {
     newCatalogProductsVisible: newCatalogResults.every((item) => item.image && item.price),
     brandSourcesVisible: brandSourceResults.every((item) => item.found),
     brandDatabaseVisible: brandDatabaseText.includes("Matarazzo") && brandDatabaseText.includes("Molinos"),
-    imageSaved: await page.locator(".product-thumb").count() > 0
+    imageSaved: productThumbCountBeforeImport > 0
   };
 
   const downloadPromise = page.waitForEvent("download");
@@ -342,7 +392,7 @@ async function run() {
   await browser.close();
   server.close();
 
-  console.log(JSON.stringify({ checks, suggestedFilename, messages }, null, 2));
+  console.log(JSON.stringify({ checks, suggestedFilename, backupFilename, messages }, null, 2));
 
   if (!Object.values(checks).every(Boolean) || messages.length) {
     process.exitCode = 1;

@@ -116,6 +116,12 @@ h3 {
   margin-top: 6px;
 }
 
+.header-actions {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 8px;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -624,5 +630,9 @@ video {
   .panel-title {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .header-actions {
+    grid-template-columns: 1fr;
   }
 }

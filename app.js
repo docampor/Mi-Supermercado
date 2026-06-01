@@ -240,6 +240,7 @@ const els = {
   stockList: $("#stockList"),
   stockSearchInput: $("#stockSearchInput"),
   reportMonthInput: $("#reportMonthInput"),
+  backupFileInput: $("#backupFileInput"),
   toast: $("#toast"),
   productDialog: $("#productDialog"),
   productForm: $("#productForm"),
@@ -285,6 +286,9 @@ function bindEvents() {
   $("#stockForm").addEventListener("submit", saveStockFromForm);
   $("#scanStockButton").addEventListener("click", scanForStock);
   $("#exportButton").addEventListener("click", exportExcel);
+  $("#exportBackupButton").addEventListener("click", exportBackup);
+  $("#importBackupButton").addEventListener("click", () => els.backupFileInput.click());
+  els.backupFileInput.addEventListener("change", importBackup);
   $("#manualBarcodeForm").addEventListener("submit", submitManualBarcode);
   $("#closeScannerButton").addEventListener("click", closeScanner);
   $("#closeProductButton").addEventListener("click", () => els.productDialog.close());
@@ -1418,8 +1422,8 @@ function renderShoppingList() {
         </div>
       </div>
       <div class="card-actions">
-        <button class="primary small" onclick="scanForPurchase('${item.id}')">Escanear</button>
-        <button class="secondary small" onclick="sendListItemToPurchase('${item.id}')">Comprar</button>
+        <button class="primary small" onclick="scanForPurchase('${item.id}')">Escanear codigo</button>
+        <button class="secondary small" onclick="sendListItemToPurchase('${item.id}')">Cargar sin escanear</button>
         <button class="secondary small" onclick="editListItem('${item.id}')">Editar</button>
         <button class="danger small" onclick="deleteListItem('${item.id}')">Eliminar</button>
       </div>
@@ -1739,6 +1743,64 @@ function exportExcel() {
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
   downloadBlob(blob, `control-stock-${dateFileKey(new Date())}.xls`);
   toast("Archivo Excel generado.");
+}
+
+function exportBackup() {
+  const backup = {
+    app: "control-stock",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: cloneState(state)
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+  downloadBlob(blob, `control-stock-backup-${dateFileKey(new Date())}.json`);
+  toast("Backup generado para compartir.");
+}
+
+function importBackup(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const importedState = normalizeBackupState(parsed);
+      const message = "Esto va a reemplazar los datos de este celular por los del backup. ¿Continuar?";
+      if (!confirm(message)) return;
+
+      Object.assign(state, importedState);
+      ensureActivePurchase();
+      saveState();
+      render();
+      toast("Backup importado. Datos actualizados.");
+    } catch {
+      toast("No pude importar ese archivo. Revisa que sea un backup de la app.");
+    }
+  };
+  reader.onerror = () => toast("No pude leer ese archivo.");
+  reader.readAsText(file);
+}
+
+function normalizeBackupState(parsed) {
+  const data = parsed?.data || parsed;
+  const importedState = {
+    products: Array.isArray(data?.products) ? data.products : [],
+    purchases: Array.isArray(data?.purchases) ? data.purchases : [],
+    shoppingList: Array.isArray(data?.shoppingList) ? data.shoppingList : [],
+    stock: Array.isArray(data?.stock) ? data.stock : []
+  };
+
+  if (!Array.isArray(data?.products) && !Array.isArray(data?.purchases) && !Array.isArray(data?.shoppingList) && !Array.isArray(data?.stock)) {
+    throw new Error("invalid backup");
+  }
+
+  return cloneState(importedState);
+}
+
+function cloneState(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function tableHtml(title, rows, columns) {

@@ -100,12 +100,17 @@
               <p class="eyebrow">Costos y resumen</p>
               <h2 id="reportsTitle">Informes</h2>
             </div>
-            <button class="primary" id="exportButton">
-              <span class="button-icon" aria-hidden="true">⇩</span>
-              Exportar Excel
-            </button>
+            <div class="header-actions">
+              <button class="primary" id="exportButton">
+                <span class="button-icon" aria-hidden="true">⇩</span>
+                Exportar Excel
+              </button>
+              <button class="secondary" id="exportBackupButton" type="button">Backup</button>
+              <button class="secondary" id="importBackupButton" type="button">Importar</button>
+            </div>
           </div>
 
+          <input class="photo-input" id="backupFileInput" type="file" accept="application/json,.json" aria-label="Importar backup">
           <div class="filter-row">
             <input id="reportMonthInput" type="month">
           </div>
