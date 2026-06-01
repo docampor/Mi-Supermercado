@@ -1239,14 +1239,26 @@ function renderLookupInfo(product) {
       ${!metadata.imageUrl && hasInfo && !product.loading ? "<small>Imagen no disponible en la base consultada.</small>" : ""}
       ${!hasInfo ? "<small>Podés cargarlo manualmente y quedará guardado para la próxima.</small>" : ""}
       <small>Fuente: ${escapeHtml(source)}</small>
-      ${priceReferenceHtml(metadata.priceReference)}
+      ${priceReferenceHtml(metadata.priceReference, product)}
     </div>
   `;
   $("#productPhotoTrigger")?.addEventListener("click", () => els.productPhotoInput.click());
 }
 
-function priceReferenceHtml(reference) {
-  if (!reference?.bestPrice) return "";
+function priceReferenceHtml(reference, product) {
+  const officialUrl = officialPriceUrl(product?.barcode || product?.metadata?.barcode || "");
+  if (!reference?.bestPrice) {
+    if (!officialUrl) return "";
+    return `
+      <div class="price-reference">
+        <small>Precio consumidor</small>
+        <strong>Consultar precio oficial</strong>
+        <small>Precios Claros publica precios diarios por comercio y ubicación.</small>
+        <small><a href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">Abrir Precios Claros</a></small>
+      </div>
+    `;
+  }
+
   const checkedAt = reference.checkedAt ? `Actualizado: ${escapeHtml(reference.checkedAt)}` : "";
   const average = reference.averagePrice ? `Promedio: ${currency.format(reference.averagePrice)}` : "";
   const details = [average, checkedAt].filter(Boolean).join(" | ");
@@ -1256,8 +1268,13 @@ function priceReferenceHtml(reference) {
       <strong>${currency.format(reference.bestPrice)}</strong>
       ${details ? `<small>${details}</small>` : ""}
       ${reference.url ? `<small><a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener">Ver fuente: ${escapeHtml(reference.source || "referencia")}</a></small>` : ""}
+      ${officialUrl ? `<small><a href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">Comparar en Precios Claros</a></small>` : ""}
     </div>
   `;
+}
+
+function officialPriceUrl(barcode) {
+  return barcode ? "https://www.preciosclaros.gob.ar/#!/buscar-productos" : "";
 }
 
 function addShoppingListItem(event) {
