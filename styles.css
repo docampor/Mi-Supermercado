@@ -377,6 +377,15 @@ h3 {
   white-space: nowrap;
 }
 
+.stock-count {
+  flex: 0 0 auto;
+  min-width: 44px;
+  color: var(--primary);
+  font-size: 1.22rem;
+  font-weight: 950;
+  text-align: right;
+}
+
 .card-actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
@@ -396,6 +405,13 @@ h3 {
 
 .stock-form {
   grid-template-columns: minmax(0, 1fr) 90px 76px auto;
+}
+
+.report-tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .low-stock-panel {
@@ -687,6 +703,22 @@ video {
   height: 52px;
 }
 
+.scanner-quantity {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: 8px;
+  align-items: end;
+}
+
+.scanner-quantity label {
+  text-align: center;
+}
+
+.scanner-quantity input {
+  text-align: center;
+  font-weight: 900;
+}
+
 .scanner-confirm {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -732,6 +764,7 @@ video {
 
   .quick-form,
   .stock-form,
+  .report-tools,
   .action-row,
   .card-actions {
     grid-template-columns: 1fr;

@@ -19,6 +19,7 @@ let scannerConfirmedCode = "";
 let scannerConfirmedProduct = null;
 let scannerDetectingPaused = false;
 let scannerMode = "purchase";
+let scannerQuantity = 1;
 let stockAlertNotifiedKeys = new Set();
 let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
@@ -268,6 +269,8 @@ const els = {
   scannerVideo: $("#scannerVideo"),
   scannerMessage: $("#scannerMessage"),
   scannerResult: $("#scannerResult"),
+  scannerQuantityBox: $("#scannerQuantityBox"),
+  scannerQtyInput: $("#scannerQtyInput"),
   scannerConfirmActions: $("#scannerConfirmActions"),
   manualBarcodeInput: $("#manualBarcodeInput")
 };
@@ -301,10 +304,18 @@ function bindEvents() {
   $("#exportBackupButton").addEventListener("click", exportBackup);
   $("#importBackupButton").addEventListener("click", () => els.backupFileInput.click());
   els.backupFileInput.addEventListener("change", importBackup);
+  $("#shareListButton").addEventListener("click", shareShoppingListReport);
+  $("#shareStockButton").addEventListener("click", shareStockReport);
+  $("#clearDataButton").addEventListener("click", clearAllData);
   $("#manualBarcodeForm").addEventListener("submit", submitManualBarcode);
   $("#closeScannerButton").addEventListener("click", closeScanner);
   $("#confirmScanButton").addEventListener("click", confirmDetectedScan);
   $("#rejectScanButton").addEventListener("click", rejectDetectedScan);
+  $("#decreaseScanQtyButton").addEventListener("click", () => changeScannerQuantity(-1));
+  $("#increaseScanQtyButton").addEventListener("click", () => changeScannerQuantity(1));
+  els.scannerQtyInput.addEventListener("input", () => {
+    scannerQuantity = Math.max(0.01, parseNumber(els.scannerQtyInput.value) || 1);
+  });
   $("#closeProductButton").addEventListener("click", () => els.productDialog.close());
   $("#cancelProductButton").addEventListener("click", () => els.productDialog.close());
   els.productForm.addEventListener("submit", saveProductEntry);
@@ -356,13 +367,17 @@ function handleImageError(event) {
   }
 }
 
-function loadState() {
-  const fallback = {
+function blankState() {
+  return {
     products: [],
     purchases: [],
     shoppingList: [],
     stock: []
   };
+}
+
+function loadState() {
+  const fallback = blankState();
 
   try {
     return { ...fallback, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") };
@@ -492,13 +507,14 @@ function renderPurchase() {
 
 function scanForPurchase(listItemId = null) {
   pendingListItemId = listItemId;
-  openScanner("purchase", async (barcode, scannedProduct = null) => {
+  openScanner("purchase", async (barcode, scannedProduct = null, scannedQty = 1) => {
     const product = scannedProduct || await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
     const listItem = pendingListItemId ? state.shoppingList.find((item) => item.id === pendingListItemId) : null;
+    const scannedQuantity = parseNumber(listItem?.quantity) || scannedQty || 1;
     addScannedProductToPurchase({
       barcode,
       name: product?.name || listItem?.name || "",
-      quantity: parseNumber(listItem?.quantity) || 1,
+      quantity: scannedQuantity,
       unitPrice: product?.lastPrice || 0,
       productInfo: product
     });
@@ -1548,10 +1564,10 @@ function saveStockFromForm(event) {
 }
 
 function scanForStock() {
-  openScanner("stock", async (barcode, scannedProduct = null) => {
+  openScanner("stock", async (barcode, scannedProduct = null, scannedQty = 1) => {
     const product = scannedProduct || await resolveBarcodeProduct(barcode, { refreshMissingImage: true });
     const name = product?.name || `Producto ${barcode}`;
-    const stockItem = adjustStock(name, barcode, 1, false);
+    const stockItem = adjustStock(name, barcode, Math.max(0.01, parseNumber(scannedQty) || 1), false);
     maybeNotifyLowStock(stockItem);
     saveState();
     render();
@@ -1610,7 +1626,7 @@ function renderStock() {
             ${isLowStock(item) ? "<span class=\"stock-badge\">Reponer</span>" : ""}
           </div>
         </div>
-        <div class="price">${formatNumber(item.quantity)}</div>
+        <div class="stock-count">${formatNumber(item.quantity)}</div>
       </div>
       <div class="card-actions">
         <button class="secondary small" onclick="changeStock('${item.id}', 1)">${svgIcon("plus")} +1</button>
@@ -1794,6 +1810,7 @@ async function openScanner(mode, callback) {
   els.manualBarcodeInput.value = "";
   resetScannerCandidate();
   clearScannerResult();
+  setScannerQuantity(1);
   els.scannerMessage.textContent = "Apunta a una franja limpia del codigo. Confirmas con OK y seguis.";
   els.scannerDialog.showModal();
 
@@ -1875,18 +1892,30 @@ function confirmDetectedScan() {
   const callback = scannerCallback;
   const code = scannerConfirmedCode;
   const product = scannerConfirmedProduct;
+  const quantity = Math.max(0.01, parseNumber(els.scannerQtyInput.value) || scannerQuantity || 1);
   clearScannerResult();
   resetScannerCandidate();
+  setScannerQuantity(1);
   els.scannerMessage.textContent = scannerMode === "stock"
     ? "Producto sumado. Apunta al siguiente codigo."
     : "Producto agregado. Apunta al siguiente codigo.";
-  if (callback) callback(code, product);
+  if (callback) callback(code, product, quantity);
 }
 
 function rejectDetectedScan() {
   clearScannerResult();
   resetScannerCandidate();
+  setScannerQuantity(1);
   els.scannerMessage.textContent = "Ok, segui apuntando al codigo correcto.";
+}
+
+function changeScannerQuantity(delta) {
+  setScannerQuantity(Math.max(0.01, (parseNumber(els.scannerQtyInput.value) || 1) + delta));
+}
+
+function setScannerQuantity(value) {
+  scannerQuantity = Math.max(0.01, parseNumber(value) || 1);
+  if (els.scannerQtyInput) els.scannerQtyInput.value = String(scannerQuantity);
 }
 
 function closeScanner() {
@@ -1911,6 +1940,7 @@ function showScannerCandidate(product) {
   ].filter(Boolean);
 
   els.scannerResult.hidden = false;
+  els.scannerQuantityBox.hidden = false;
   els.scannerConfirmActions.hidden = false;
   els.scannerResult.innerHTML = `
     ${metadata.imageUrl ? `<img class="lookup-image" src="${escapeHtml(metadata.imageUrl)}" alt="${escapeHtml(product.name || "Producto")}">` : `<div class="lookup-image placeholder">Sin foto</div>`}
@@ -1927,10 +1957,12 @@ function clearScannerResult() {
   scannerConfirmedCode = "";
   scannerConfirmedProduct = null;
   scannerDetectingPaused = false;
+  setScannerQuantity(1);
   if (els.scannerResult) {
     els.scannerResult.hidden = true;
     els.scannerResult.innerHTML = "";
   }
+  if (els.scannerQuantityBox) els.scannerQuantityBox.hidden = true;
   if (els.scannerConfirmActions) els.scannerConfirmActions.hidden = true;
 }
 
@@ -2015,6 +2047,55 @@ function exportBackup() {
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
   downloadBlob(blob, `control-stock-backup-${dateFileKey(new Date())}.json`);
   toast("Backup generado para compartir.");
+}
+
+function shareShoppingListReport() {
+  const lines = state.shoppingList.length
+    ? state.shoppingList.map((item) => `- ${item.name}${item.quantity ? ` (${item.quantity})` : ""}`)
+    : ["Sin productos en la lista."];
+  shareOrDownloadReport("Lista de compras", lines, "lista-compras");
+}
+
+function shareStockReport() {
+  const lines = state.stock.length
+    ? state.stock
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, "es"))
+        .map((item) => `- ${item.name}: ${formatNumber(item.quantity)} disponible${item.minStock !== undefined ? ` | minimo ${formatNumber(getMinStock(item))}` : ""}`)
+    : ["Sin stock cargado."];
+  shareOrDownloadReport("Stock actual", lines, "stock-actual");
+}
+
+async function shareOrDownloadReport(title, lines, filenamePrefix) {
+  const text = [
+    title,
+    `Generado: ${formatDateTime(new Date().toISOString())}`,
+    "",
+    ...lines
+  ].join("\n");
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text });
+      toast("Listado compartido.");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+
+  downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), `${filenamePrefix}-${dateFileKey(new Date())}.txt`);
+  toast("Listado generado para imprimir o compartir.");
+}
+
+function clearAllData() {
+  if (!confirm("Esto elimina compras, stock, lista, productos guardados, fotos y backups locales de esta app. ¿Reiniciar desde cero?")) return;
+  Object.assign(state, blankState());
+  localStorage.removeItem(STORAGE_KEY);
+  ensureActivePurchase();
+  saveState();
+  render();
+  toast("Datos eliminados. App reiniciada.");
 }
 
 function importBackup(event) {

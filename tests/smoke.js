@@ -326,8 +326,17 @@ async function run() {
 
   await page.getByRole("button", { name: "Informes" }).click();
   await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+  });
 
   const bodyText = await page.locator("body").innerText();
+  const listReportDownloadPromise = page.waitForEvent("download");
+  await page.locator("#shareListButton").click();
+  const listReportFilename = (await listReportDownloadPromise).suggestedFilename();
+  const stockReportDownloadPromise = page.waitForEvent("download");
+  await page.locator("#shareStockButton").click();
+  const stockReportFilename = (await stockReportDownloadPromise).suggestedFilename();
   const productThumbCountBeforeImport = await page.locator(".product-thumb").count();
   const backupDownloadPromise = page.waitForEvent("download");
   await page.locator("#exportBackupButton").click();
@@ -380,6 +389,8 @@ async function run() {
     listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
     lowStockVisible: lowStockText.includes("Para reponer") && lowStockText.includes("Leche") && lowStockText.includes("Minimo"),
     restockListAdded: restockListText.includes("Leche") && restockListText.includes("Escanear codigo"),
+    printableReports: listReportFilename.includes("lista-compras") && stockReportFilename.includes("stock-actual"),
+    clearDataVisible: bodyText.includes("Limpiar datos"),
     backupExported: backupFilename.endsWith(".json") && backupFilename.includes("control-stock-backup"),
     backupImported: importedState.shoppingList.some((item) => item.name === "Cafe importado") &&
       importedState.stock.some((item) => item.name === "Yerba importada"),
@@ -387,7 +398,8 @@ async function run() {
       const source = window.openScanner.toString();
       const confirmSource = window.confirmDetectedScan.toString();
       return source.includes("ean_13") && source.includes("upc_a") && !source.includes("code_128") && !source.includes("code_39") &&
-        Boolean(document.querySelector("#scannerResult")) && Boolean(document.querySelector("#scannerConfirmActions")) &&
+        Boolean(document.querySelector("#scannerResult")) && Boolean(document.querySelector("#scannerQuantityBox")) &&
+        Boolean(document.querySelector("#scannerConfirmActions")) &&
         !confirmSource.includes("closeScanner()");
     }),
     lookupImageVisible: Boolean(lookupImageSrc),
@@ -411,7 +423,7 @@ async function run() {
   await browser.close();
   server.close();
 
-  console.log(JSON.stringify({ checks, suggestedFilename, backupFilename, messages }, null, 2));
+  console.log(JSON.stringify({ checks, suggestedFilename, backupFilename, listReportFilename, stockReportFilename, messages }, null, 2));
 
   if (!Object.values(checks).every(Boolean) || messages.length) {
     process.exitCode = 1;

@@ -156,6 +156,20 @@
           <div class="filter-row">
             <input id="reportMonthInput" type="month">
           </div>
+          <div class="report-tools">
+            <button class="secondary" id="shareListButton" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
+              Lista imprimible
+            </button>
+            <button class="secondary" id="shareStockButton" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-box"></use></svg>
+              Stock imprimible
+            </button>
+            <button class="danger" id="clearDataButton" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg>
+              Limpiar datos
+            </button>
+          </div>
           <div class="summary-grid" id="reportSummary"></div>
           <div class="panel">
             <h3>Compras del mes</h3>
@@ -267,6 +281,18 @@
         </div>
         <p class="hint" id="scannerMessage">Apunta al codigo de barras del producto.</p>
         <div class="scanner-result" id="scannerResult" hidden></div>
+        <div class="scanner-quantity" id="scannerQuantityBox" hidden>
+          <button class="secondary" type="button" id="decreaseScanQtyButton">
+            <svg class="icon" aria-hidden="true"><use href="#icon-minus"></use></svg>
+          </button>
+          <label>
+            Cantidad
+            <input id="scannerQtyInput" type="number" min="0.01" step="0.01" value="1">
+          </label>
+          <button class="secondary" type="button" id="increaseScanQtyButton">
+            <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+          </button>
+        </div>
         <div class="scanner-confirm" id="scannerConfirmActions" hidden>
           <button class="primary" type="button" id="confirmScanButton">
             <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
