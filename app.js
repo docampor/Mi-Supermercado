@@ -219,6 +219,9 @@ const ARGENTINA_BRAND_DATABASE = [
   }
 ];
 
+const SEPA_DATASET_API = "https://datos.produccion.gob.ar/api/3/action/package_show?id=sepa-precios";
+let sepaDatasetReferencePromise = null;
+
 const $ = (selector) => document.querySelector(selector);
 
 const els = {
@@ -671,7 +674,7 @@ async function resolveBarcodeProduct(barcode, options = {}) {
   const hintProduct = typedHint ? { barcode, name: typedHint, metadata: enrichMetadataWithBrand(typedHint, {}) } : null;
   const externalProduct = await fetchExternalProduct(barcode, { product: mergeProductData(localProduct, hintProduct) });
   if (externalProduct) {
-    const mergedProduct = mergeProductData(localProduct, externalProduct);
+    const mergedProduct = mergeProductData(mergeProductData(localProduct, hintProduct), externalProduct);
     upsertProduct(mergedProduct);
     saveState();
     toast(mergedProduct.metadata?.imageUrl ? "Producto e imagen encontrados." : "Producto encontrado sin imagen.");
@@ -887,7 +890,7 @@ async function fetchExternalProduct(barcode, hints = {}) {
 
   try {
     let bestProduct = null;
-    const priceReference = findArgentinaCatalogProduct(barcode)?.metadata?.priceReference || null;
+    const priceReference = findArgentinaCatalogProduct(barcode)?.metadata?.priceReference || await fetchSepaDatasetReference(controller.signal);
     for (const url of urls) {
       const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
       if (!response.ok) continue;
@@ -939,6 +942,29 @@ async function fetchExternalProduct(barcode, hints = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchSepaDatasetReference(signal) {
+  sepaDatasetReferencePromise = sepaDatasetReferencePromise || fetch(SEPA_DATASET_API, { signal, cache: "no-store" })
+    .then((response) => response.ok ? response.json() : null)
+    .then((data) => {
+      const resources = data?.result?.resources || [];
+      const latest = resources
+        .filter((resource) => String(resource.format || "").toLowerCase() === "zip" && resource.url)
+        .sort((a, b) => new Date(b.last_modified || 0) - new Date(a.last_modified || 0))[0];
+
+      if (!latest) return null;
+      return {
+        source: "SEPA / Datos Abiertos",
+        url: latest.url,
+        checkedAt: latest.last_modified ? latest.last_modified.slice(0, 10) : "",
+        datasetName: latest.name || "Base SEPA",
+        official: true
+      };
+    })
+    .catch(() => null);
+
+  return sepaDatasetReferencePromise;
 }
 
 async function fetchPriceReference(barcode, signal) {
@@ -1248,13 +1274,16 @@ function renderLookupInfo(product) {
 function priceReferenceHtml(reference, product) {
   const officialUrl = officialPriceUrl(product?.barcode || product?.metadata?.barcode || "");
   if (!reference?.bestPrice) {
-    if (!officialUrl) return "";
+    const referenceUrl = reference?.url || officialUrl;
+    if (!referenceUrl) return "";
+    const checkedAt = reference?.checkedAt ? `Actualizado: ${escapeHtml(reference.checkedAt)}` : "";
     return `
       <div class="price-reference">
-        <small>Precio consumidor</small>
+        <small>Fuente principal: SEPA / Precios Claros</small>
         <strong>Consultar precio oficial</strong>
-        <small>Precios Claros publica precios diarios por comercio y ubicación.</small>
-        <small><a href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">Abrir Precios Claros</a></small>
+        <small>SEPA publica precios diarios por comercio, ubicación, precio de lista y promociones.</small>
+        ${checkedAt ? `<small>${checkedAt}</small>` : ""}
+        <small><a href="${escapeHtml(referenceUrl)}" target="_blank" rel="noopener">${reference?.official ? "Descargar base SEPA oficial" : "Abrir Precios Claros"}</a></small>
       </div>
     `;
   }
@@ -1264,11 +1293,12 @@ function priceReferenceHtml(reference, product) {
   const details = [average, checkedAt].filter(Boolean).join(" | ");
   return `
     <div class="price-reference">
-      <small>Mejor precio consumidor encontrado</small>
-      <strong>${currency.format(reference.bestPrice)}</strong>
+      <small>Fuente principal: SEPA / Precios Claros</small>
+      <strong>Comparar precio oficial</strong>
+      ${officialUrl ? `<small><a href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">Abrir Precios Claros</a></small>` : ""}
+      <small>Referencia auxiliar encontrada: ${currency.format(reference.bestPrice)}</small>
       ${details ? `<small>${details}</small>` : ""}
-      ${reference.url ? `<small><a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener">Ver fuente: ${escapeHtml(reference.source || "referencia")}</a></small>` : ""}
-      ${officialUrl ? `<small><a href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">Comparar en Precios Claros</a></small>` : ""}
+      ${reference.url ? `<small><a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener">Ver referencia auxiliar: ${escapeHtml(reference.source || "referencia")}</a></small>` : ""}
     </div>
   `;
 }

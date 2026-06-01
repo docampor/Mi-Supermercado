@@ -130,6 +130,25 @@ async function run() {
   await page.route(/https:\/\/world\.openfoodfacts\.org\/api\/v3\/product\/9999999999999.*/, (route) => {
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ product: null }) });
   });
+  await page.route("https://datos.produccion.gob.ar/api/3/action/package_show?id=sepa-precios", (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        result: {
+          resources: [
+            {
+              name: "Viernes",
+              format: "ZIP",
+              url: "https://datos.produccion.gob.ar/sepa_viernes.zip",
+              last_modified: "2026-06-01T12:00:00"
+            }
+          ]
+        }
+      })
+    });
+  });
 
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
   await page.evaluate((barcode) => localStorage.setItem("control-stock-v1", JSON.stringify({
@@ -263,7 +282,8 @@ async function run() {
     lookupImageVisible: Boolean(lookupImageSrc),
     fallbackImageVisible: Boolean(fallbackImageSrc),
     catalogImageVisible: Boolean(catalogImageSrc),
-    priceReferenceVisible: catalogPriceText.includes("Mejor precio") && catalogPriceText.includes("$"),
+    priceReferenceVisible: catalogPriceText.includes("SEPA") && catalogPriceText.includes("Precios Claros") && catalogPriceText.includes("$"),
+    sepaDatasetVisible: brandDatabaseText.includes("SEPA") || catalogPriceText.includes("SEPA"),
     newCatalogProductsVisible: newCatalogResults.every((item) => item.image && item.price),
     brandSourcesVisible: brandSourceResults.every((item) => item.found),
     brandDatabaseVisible: brandDatabaseText.includes("Matarazzo") && brandDatabaseText.includes("Molinos"),
