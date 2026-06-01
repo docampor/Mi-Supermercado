@@ -76,17 +76,28 @@
               <p class="eyebrow">Antes de salir</p>
               <h2 id="stockTitle">Stock en casa</h2>
             </div>
-            <button class="secondary" id="scanStockButton">
-              <span class="button-icon" aria-hidden="true">▣</span>
-              Escanear
-            </button>
+            <div class="header-actions stock-actions">
+              <button class="secondary" id="enableStockAlertsButton" type="button">Alertas</button>
+              <button class="secondary" id="scanStockButton">
+                <span class="button-icon" aria-hidden="true">▣</span>
+                Escanear
+              </button>
+            </div>
           </div>
 
-          <form class="quick-form" id="stockForm">
+          <form class="quick-form stock-form" id="stockForm">
             <input id="stockNameInput" autocomplete="off" placeholder="Producto" required>
             <input id="stockQtyInput" autocomplete="off" placeholder="Cantidad" inputmode="decimal" required>
+            <input id="stockMinInput" autocomplete="off" placeholder="Min." inputmode="decimal">
             <button class="primary" type="submit">Guardar</button>
           </form>
+
+          <div class="panel low-stock-panel" id="lowStockPanel" hidden>
+            <div class="panel-title">
+              <h3>Para reponer</h3>
+            </div>
+            <div class="list compact" id="lowStockList"></div>
+          </div>
 
           <div class="filter-row">
             <input id="stockSearchInput" autocomplete="off" placeholder="Buscar en stock">

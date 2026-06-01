@@ -122,6 +122,10 @@ h3 {
   gap: 8px;
 }
 
+.stock-actions {
+  grid-template-columns: repeat(2, max-content);
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -329,6 +333,31 @@ h3 {
   grid-template-columns: minmax(0, 1fr) 88px auto;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.stock-form {
+  grid-template-columns: minmax(0, 1fr) 90px 76px auto;
+}
+
+.low-stock-panel {
+  margin-bottom: 16px;
+}
+
+.stock-alert {
+  border-color: rgba(201, 79, 45, 0.46);
+  background: #fff5ed;
+}
+
+.stock-badge {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 5px;
+  padding: 4px 8px;
+  color: #8d2f1d;
+  background: #f7e1dc;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
 }
 
 input {
@@ -616,6 +645,7 @@ video {
   }
 
   .quick-form,
+  .stock-form,
   .action-row,
   .card-actions {
     grid-template-columns: 1fr;

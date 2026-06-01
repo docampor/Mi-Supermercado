@@ -310,6 +310,12 @@ async function run() {
   await page.locator("#stockNameInput").fill("Arroz");
   await page.locator("#stockQtyInput").fill("3");
   await page.getByRole("button", { name: "Guardar" }).click();
+  await page.locator("#stockNameInput").fill("Leche");
+  await page.locator("#stockQtyInput").fill("1");
+  await page.locator("#stockMinInput").fill("2");
+  await page.getByRole("button", { name: "Guardar" }).click();
+  await page.waitForFunction(() => document.querySelector("#lowStockPanel:not([hidden])")?.textContent.includes("Leche"), null, { timeout: 5000 });
+  const lowStockText = await page.locator("#lowStockPanel").innerText();
 
   await page.getByRole("button", { name: "Informes" }).click();
   await page.waitForTimeout(300);
@@ -365,6 +371,7 @@ async function run() {
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
     listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
+    lowStockVisible: lowStockText.includes("Para reponer") && lowStockText.includes("Leche") && lowStockText.includes("Minimo"),
     backupExported: backupFilename.endsWith(".json") && backupFilename.includes("control-stock-backup"),
     backupImported: importedState.shoppingList.some((item) => item.name === "Cafe importado") &&
       importedState.stock.some((item) => item.name === "Yerba importada"),

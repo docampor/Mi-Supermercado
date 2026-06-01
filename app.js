@@ -15,6 +15,7 @@ let scannerLoop = 0;
 let scannerCandidateCode = "";
 let scannerCandidateCount = 0;
 let scannerCandidateAt = 0;
+let stockAlertNotifiedKeys = new Set();
 let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
 
@@ -238,7 +239,10 @@ const els = {
   reportSummary: $("#reportSummary"),
   shoppingList: $("#shoppingList"),
   stockList: $("#stockList"),
+  lowStockPanel: $("#lowStockPanel"),
+  lowStockList: $("#lowStockList"),
   stockSearchInput: $("#stockSearchInput"),
+  stockMinInput: $("#stockMinInput"),
   reportMonthInput: $("#reportMonthInput"),
   backupFileInput: $("#backupFileInput"),
   toast: $("#toast"),
@@ -285,6 +289,7 @@ function bindEvents() {
   $("#shoppingListForm").addEventListener("submit", addShoppingListItem);
   $("#stockForm").addEventListener("submit", saveStockFromForm);
   $("#scanStockButton").addEventListener("click", scanForStock);
+  $("#enableStockAlertsButton").addEventListener("click", enableStockAlerts);
   $("#exportButton").addEventListener("click", exportExcel);
   $("#exportBackupButton").addEventListener("click", exportBackup);
   $("#importBackupButton").addEventListener("click", () => els.backupFileInput.click());
@@ -565,7 +570,9 @@ function saveProductEntry(event) {
   upsertProduct({ barcode, name, lastPrice: unitPrice, metadata });
 
   if (activeProductContext === "stock") {
-    adjustStock(name, barcode, quantity, true);
+    const stockItem = adjustStock(name, barcode, quantity, true);
+    maybeNotifyLowStock(stockItem);
+    saveState();
     els.productDialog.close();
     render();
     toast("Stock actualizado.");
@@ -1466,12 +1473,15 @@ function saveStockFromForm(event) {
   const qtyInput = $("#stockQtyInput");
   const name = nameInput.value.trim();
   const quantity = parseNumber(qtyInput.value);
+  const minStock = parseNumber(els.stockMinInput.value || 1);
   if (!name || quantity < 0) return;
-  adjustStock(name, "", quantity, true);
+  const item = adjustStock(name, "", quantity, true, minStock);
+  maybeNotifyLowStock(item);
   nameInput.value = "";
   qtyInput.value = "";
+  els.stockMinInput.value = "";
   saveState();
-  renderStock();
+  render();
   toast("Stock guardado.");
 }
 
@@ -1489,7 +1499,7 @@ function scanForStock() {
   });
 }
 
-function adjustStock(name, barcode, quantity, replace) {
+function adjustStock(name, barcode, quantity, replace, minStock = null) {
   const normalized = normalize(name);
   const item = state.stock.find((entry) => (barcode && entry.barcode === barcode) || normalize(entry.name) === normalized);
   const product = barcode ? findProductByBarcode(barcode) : state.products.find((entry) => normalize(entry.name) === normalized);
@@ -1497,21 +1507,27 @@ function adjustStock(name, barcode, quantity, replace) {
     item.barcode = barcode || item.barcode;
     item.name = name;
     item.quantity = replace ? quantity : Math.max(0, Number(item.quantity || 0) + quantity);
+    item.minStock = normalizeMinStock(minStock, item.minStock);
     item.metadata = { ...(item.metadata || {}), ...(product?.metadata || {}) };
     item.updatedAt = new Date().toISOString();
+    return item;
   } else {
-    state.stock.push({
+    const newItem = {
       id: uid("stock"),
       barcode,
       name,
       quantity: Math.max(0, quantity),
+      minStock: normalizeMinStock(minStock, 1),
       metadata: product?.metadata || {},
       updatedAt: new Date().toISOString()
-    });
+    };
+    state.stock.push(newItem);
+    return newItem;
   }
 }
 
 function renderStock() {
+  renderLowStock();
   const query = normalize(els.stockSearchInput.value);
   const rows = state.stock
     .filter((item) => !query || normalize(item.name).includes(query) || item.barcode?.includes(query))
@@ -1523,13 +1539,15 @@ function renderStock() {
   }
 
   els.stockList.innerHTML = rows.map((item) => `
-    <article class="item-card">
+    <article class="item-card ${isLowStock(item) ? "stock-alert" : ""}">
       <div class="item-main">
         <div class="item-identity">
           ${productImage(item.metadata?.imageUrl, item.name)}
           <div>
             <strong>${escapeHtml(item.name)}</strong>
             <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
+            <small>Minimo: ${formatNumber(getMinStock(item))}</small>
+            ${isLowStock(item) ? "<span class=\"stock-badge\">Reponer</span>" : ""}
           </div>
         </div>
         <div class="price">${formatNumber(item.quantity)}</div>
@@ -1548,14 +1566,80 @@ function changeStock(itemId, delta) {
   if (!item) return;
   item.quantity = Math.max(0, Number(item.quantity || 0) + delta);
   item.updatedAt = new Date().toISOString();
+  maybeNotifyLowStock(item);
   saveState();
-  renderStock();
+  render();
 }
 
 function deleteStock(itemId) {
   state.stock = state.stock.filter((item) => item.id !== itemId);
   saveState();
-  renderStock();
+  render();
+}
+
+function renderLowStock() {
+  const lowStockItems = state.stock
+    .filter(isLowStock)
+    .sort((a, b) => Number(a.quantity || 0) - Number(b.quantity || 0) || a.name.localeCompare(b.name, "es"));
+
+  els.lowStockPanel.hidden = lowStockItems.length === 0;
+  if (!lowStockItems.length) {
+    els.lowStockList.innerHTML = "";
+    return;
+  }
+
+  els.lowStockList.innerHTML = lowStockItems.map((item) => `
+    <article class="item-card stock-alert">
+      <div class="item-main">
+        <div>
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>Actual: ${formatNumber(item.quantity)} | Minimo: ${formatNumber(getMinStock(item))}</small>
+        </div>
+        <span class="stock-badge">Reponer</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function isLowStock(item) {
+  return Number(item.quantity || 0) <= getMinStock(item);
+}
+
+function getMinStock(item) {
+  const minStock = Number(item.minStock);
+  return Number.isFinite(minStock) && minStock >= 0 ? minStock : 1;
+}
+
+function normalizeMinStock(value, fallback) {
+  if (value === null || value === undefined || value === "") return getMinStock({ minStock: fallback });
+  const number = parseNumber(value);
+  return Math.max(0, number);
+}
+
+async function enableStockAlerts() {
+  if (!("Notification" in window)) {
+    toast("Este navegador no permite notificaciones.");
+    return;
+  }
+
+  if (Notification.permission === "granted") {
+    toast("Alertas de stock ya activadas.");
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  toast(permission === "granted" ? "Alertas de stock activadas." : "Alertas no activadas.");
+}
+
+function maybeNotifyLowStock(item) {
+  if (!item || !isLowStock(item)) return;
+  const key = `${item.id}:${item.quantity}:${getMinStock(item)}`;
+  if (stockAlertNotifiedKeys.has(key)) return;
+  stockAlertNotifiedKeys.add(key);
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  new Notification("Stock bajo", {
+    body: `${item.name}: quedan ${formatNumber(item.quantity)}. Minimo ${formatNumber(getMinStock(item))}.`
+  });
 }
 
 function renderReports() {
@@ -1735,7 +1819,7 @@ function exportExcel() {
       <head><meta charset="utf-8"></head>
       <body>
         ${tableHtml("Compras", rows, ["fecha", "codigo", "producto", "marca", "presentacion", "categoria", "cantidad", "precioUnitario", "promocion", "total"])}
-        ${tableHtml("Stock", state.stock, ["barcode", "name", "quantity", "updatedAt"])}
+        ${tableHtml("Stock", state.stock, ["barcode", "name", "quantity", "minStock", "updatedAt"])}
         ${tableHtml("Lista", state.shoppingList, ["name", "quantity", "createdAt"])}
       </body>
     </html>
