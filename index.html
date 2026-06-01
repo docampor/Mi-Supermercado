@@ -27,6 +27,10 @@
       <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"></path></symbol>
       <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 4.5 2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0Z"></path></symbol>
       <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20 13 13 20 4 11V4h7l9 9Z"></path><path d="M7.5 7.5h.01"></path></symbol>
+      <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></symbol>
+      <symbol id="icon-apple" viewBox="0 0 24 24"><path d="M12 7c-3-3-8 0-7 6 1 6 5 8 7 6 2 2 6 0 7-6 1-6-4-9-7-6Z"></path><path d="M12 7c0-2 1-4 4-4"></path></symbol>
+      <symbol id="icon-droplet" viewBox="0 0 24 24"><path d="M12 3s7 7 7 12a7 7 0 0 1-14 0c0-5 7-12 7-12Z"></path></symbol>
+      <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Z"></path><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z"></path><path d="M5 15l.7 1.8L8 17.5l-2.3.7L5 20l-.7-1.8L2 17.5l2.3-.7L5 15Z"></path></symbol>
     </svg>
     <div class="app-shell">
       <header class="topbar">
@@ -40,7 +44,53 @@
       </header>
 
       <main>
-        <section class="view active" id="view-shop" aria-labelledby="shopTitle">
+        <section class="view active" id="view-home" aria-labelledby="homeTitle">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Resumen de hoy</p>
+              <h2 id="homeTitle">Inicio</h2>
+            </div>
+          </div>
+
+          <div class="summary-grid home-summary" id="homeSummary"></div>
+
+          <div class="home-actions">
+            <button class="primary wide" id="homeShopButton" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-cart"></use></svg>
+              Ir de compras
+            </button>
+            <button class="secondary wide" id="homeScanPurchaseButton" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-scan"></use></svg>
+              Escanear compra
+            </button>
+            <button class="secondary wide" id="homeStockButton" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-box"></use></svg>
+              Ver stock
+            </button>
+            <button class="secondary wide" id="homeListButton" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
+              Ver lista
+            </button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">
+              <h3>Para mirar antes de salir</h3>
+              <button class="primary small" id="homeScanStockButton" type="button">
+                <svg class="icon" aria-hidden="true"><use href="#icon-scan"></use></svg>
+                Escanear stock
+              </button>
+            </div>
+            <div class="list compact" id="homeAlerts"></div>
+          </div>
+
+          <div class="panel">
+            <h3>Ultima actividad</h3>
+            <div class="list compact" id="homeRecent"></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-shop" aria-labelledby="shopTitle">
           <div class="section-head">
             <div>
               <p class="eyebrow">Compra actual</p>
@@ -183,7 +233,11 @@
       </main>
 
       <nav class="bottom-nav" aria-label="Secciones">
-        <button class="nav-button active" data-view="shop">
+        <button class="nav-button active" data-view="home">
+          <svg class="icon" aria-hidden="true"><use href="#icon-home"></use></svg>
+          Inicio
+        </button>
+        <button class="nav-button" data-view="shop">
           <svg class="icon" aria-hidden="true"><use href="#icon-cart"></use></svg>
           Compra
         </button>
@@ -283,6 +337,7 @@
           <video id="scannerVideo" playsinline muted></video>
           <div class="scan-line" aria-hidden="true"></div>
         </div>
+        <div class="scanner-session" id="scannerSessionSummary"></div>
         <p class="hint" id="scannerMessage">Apunta al codigo de barras del producto.</p>
         <div class="scanner-result" id="scannerResult" hidden></div>
         <div class="scanner-quantity" id="scannerQuantityBox" hidden>

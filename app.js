@@ -252,6 +252,9 @@ const $ = (selector) => document.querySelector(selector);
 
 const els = {
   installButton: $("#installButton"),
+  homeSummary: $("#homeSummary"),
+  homeAlerts: $("#homeAlerts"),
+  homeRecent: $("#homeRecent"),
   purchaseSummary: $("#purchaseSummary"),
   purchaseItems: $("#purchaseItems"),
   purchaseHistory: $("#purchaseHistory"),
@@ -284,6 +287,7 @@ const els = {
   scannerDialog: $("#scannerDialog"),
   scannerVideo: $("#scannerVideo"),
   scannerMessage: $("#scannerMessage"),
+  scannerSessionSummary: $("#scannerSessionSummary"),
   scannerResult: $("#scannerResult"),
   scannerQuantityBox: $("#scannerQuantityBox"),
   scannerQtyInput: $("#scannerQtyInput"),
@@ -359,6 +363,18 @@ function bindEvents() {
     els.installButton.hidden = false;
   });
 
+  $("#homeShopButton").addEventListener("click", () => showView("shop"));
+  $("#homeScanPurchaseButton").addEventListener("click", () => {
+    showView("shop");
+    scanForPurchase();
+  });
+  $("#homeStockButton").addEventListener("click", () => showView("stock"));
+  $("#homeListButton").addEventListener("click", () => showView("list"));
+  $("#homeScanStockButton").addEventListener("click", () => {
+    showView("stock");
+    scanForStock();
+  });
+
   els.installButton.addEventListener("click", async () => {
     if (!deferredInstallPrompt) return;
     deferredInstallPrompt.prompt();
@@ -416,6 +432,7 @@ function uid(prefix) {
 }
 
 function render() {
+  renderHome();
   renderPurchase();
   renderShoppingList();
   renderStock();
@@ -428,6 +445,54 @@ function showView(viewName) {
   document.querySelectorAll(".nav-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === viewName);
   });
+}
+
+function renderHome() {
+  const active = ensureActivePurchase();
+  const month = monthKey(new Date());
+  const monthPurchases = state.purchases.filter((purchase) => monthKey(new Date(purchase.startedAt)) === month && purchase.items.length > 0);
+  const monthTotal = monthPurchases.reduce((sum, purchase) => sum + purchase.items.reduce((itemSum, item) => itemSum + Number(item.total || 0), 0), 0);
+  const activeTotal = active.items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const lowStockItems = state.stock.filter(isLowStock);
+  const pendingListItems = state.shoppingList.length;
+
+  els.homeSummary.innerHTML = [
+    metric(currency.format(activeTotal), "Compra abierta", "cart"),
+    metric(currency.format(monthTotal), "Gasto del mes", "chart"),
+    metric(lowStockItems.length, "Para reponer", "alert"),
+    metric(pendingListItems, "En lista", "list")
+  ].join("");
+
+  const alerts = lowStockItems
+    .sort((a, b) => Number(a.quantity || 0) - Number(b.quantity || 0) || a.name.localeCompare(b.name, "es"))
+    .slice(0, 4);
+  els.homeAlerts.innerHTML = alerts.length
+    ? alerts.map((item) => `
+      <article class="home-card stock-alert">
+        <span class="category-symbol">${categoryIcon(getItemCategory(item))}</span>
+        <div>
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>${formatNumber(item.quantity)} disp. | minimo ${formatNumber(getMinStock(item))}</small>
+        </div>
+      </article>
+    `).join("")
+    : emptyState("No hay alertas de stock por ahora.");
+
+  const recentPurchase = state.purchases
+    .filter((purchase) => purchase.items.length > 0)
+    .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0];
+  const recentTotal = recentPurchase?.items.reduce((sum, item) => sum + Number(item.total || 0), 0) || 0;
+  els.homeRecent.innerHTML = recentPurchase
+    ? `
+      <article class="home-card">
+        <span class="category-symbol">${svgIcon("cart")}</span>
+        <div>
+          <strong>${formatDateTime(recentPurchase.startedAt)}</strong>
+          <small>${recentPurchase.items.length} productos | ${currency.format(recentTotal)}</small>
+        </div>
+      </article>
+    `
+    : emptyState("Todavia no hay compras cerradas.");
 }
 
 function ensureActivePurchase() {
@@ -1006,7 +1071,7 @@ function renderCategoryGroups(items, renderCard, metricRenderer = null) {
     .map(([category, groupItems]) => `
       <details class="category-group" open>
         <summary class="category-summary">
-          <span>${escapeHtml(category)}</span>
+          <span class="category-heading"><span class="category-symbol">${categoryIcon(category)}</span>${escapeHtml(category)}</span>
           <small>${formatNumber(groupItems.length)} ${groupItems.length === 1 ? "producto" : "productos"}${metricRenderer ? ` | ${escapeHtml(metricRenderer(groupItems))}` : ""}</small>
         </summary>
         <div class="category-items">
@@ -2036,6 +2101,7 @@ async function openScanner(mode, callback) {
   resetScannerCandidate();
   clearScannerResult();
   setScannerQuantity(1);
+  updateScannerSessionSummary();
   els.scannerMessage.textContent = "Apunta a una franja limpia del codigo. Confirmas con OK y seguis.";
   els.scannerDialog.showModal();
 
@@ -2113,7 +2179,7 @@ async function previewDetectedScan(code) {
     : "No encontre datos. Si el codigo es correcto, podes aceptarlo y cargarlo manualmente.";
 }
 
-function confirmDetectedScan() {
+async function confirmDetectedScan() {
   if (!scannerConfirmedCode) return;
   const callback = scannerCallback;
   const code = scannerConfirmedCode;
@@ -2125,7 +2191,8 @@ function confirmDetectedScan() {
   els.scannerMessage.textContent = scannerMode === "stock"
     ? "Producto sumado. Apunta al siguiente codigo."
     : "Producto agregado. Apunta al siguiente codigo.";
-  if (callback) callback(code, product, quantity);
+  if (callback) await callback(code, product, quantity);
+  updateScannerSessionSummary();
 }
 
 function rejectDetectedScan() {
@@ -2155,6 +2222,25 @@ function closeScanner() {
   }
   els.scannerVideo.srcObject = null;
   if (els.scannerDialog.open) els.scannerDialog.close();
+}
+
+function updateScannerSessionSummary() {
+  if (!els.scannerSessionSummary) return;
+  if (scannerMode === "stock") {
+    const lowStockCount = state.stock.filter(isLowStock).length;
+    els.scannerSessionSummary.innerHTML = `
+      <span>${svgIcon("box")} ${formatNumber(state.stock.length)} en stock</span>
+      <span>${svgIcon("alert")} ${formatNumber(lowStockCount)} para reponer</span>
+    `;
+    return;
+  }
+
+  const active = ensureActivePurchase();
+  const total = active.items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  els.scannerSessionSummary.innerHTML = `
+    <span>${svgIcon("cart")} ${formatNumber(active.items.length)} productos</span>
+    <span>${svgIcon("tag")} ${currency.format(total)}</span>
+  `;
 }
 
 function showScannerCandidate(product) {
@@ -2641,8 +2727,8 @@ function registerServiceWorker() {
   }
 }
 
-function metric(value, label) {
-  return `<div class="metric"><span class="metric-icon">${svgIcon("tag")}</span><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`;
+function metric(value, label, icon = "tag") {
+  return `<div class="metric"><span class="metric-icon">${svgIcon(icon)}</span><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`;
 }
 
 function emptyState(text) {
@@ -2652,6 +2738,16 @@ function emptyState(text) {
 function productImage(url, name) {
   if (!url) return "";
   return `<img class="product-thumb" src="${escapeHtml(url)}" alt="${escapeHtml(name)}" loading="lazy">`;
+}
+
+function categoryIcon(category) {
+  const normalized = normalize(category);
+  if (normalized.includes("alimento") || normalized.includes("fresco")) return svgIcon("apple");
+  if (normalized.includes("bebida") || normalized.includes("lacteo")) return svgIcon("droplet");
+  if (normalized.includes("limpieza") || normalized.includes("perfumeria")) return svgIcon("sparkles");
+  if (normalized.includes("almacen") || normalized.includes("congelado")) return svgIcon("box");
+  if (normalized.includes("mascota")) return svgIcon("tag");
+  return svgIcon("tag");
 }
 
 function svgIcon(name) {

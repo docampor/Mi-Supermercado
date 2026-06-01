@@ -1,0 +1,381 @@
+{
+  "app": "control-stock",
+  "version": 1,
+  "exportedAt": "2026-06-01T20:35:37.785Z",
+  "data": {
+    "products": [
+      {
+        "id": "product-1780345971954-a81ff6cebd8eb8",
+        "key": "7790520028655",
+        "barcode": "7790520028655",
+        "name": "Raid - Mata Moscas y Mosquitos Aerosol 380 ml",
+        "lastPrice": "",
+        "metadata": {
+          "brand": "Raid",
+          "quantityLabel": "380 ml",
+          "category": "Limpieza / Insecticida",
+          "productType": "catalogo argentino",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/107152283.jpeg",
+          "source": "Catalogo argentino + Go-UPC",
+          "priceReference": {
+            "bestPrice": 5700,
+            "averagePrice": 7084.14,
+            "dealPrice": 7160,
+            "source": "Pricely",
+            "url": "https://pricely.ar/product/7790520028655",
+            "checkedAt": "2026-05-31"
+          },
+          "company": "SC Johnson",
+          "brandSource": "Base de marcas Argentina"
+        },
+        "updatedAt": "2026-06-01T20:32:51.954Z"
+      },
+      {
+        "id": "product-1780345983187-294071801d4378",
+        "key": "7790272000954",
+        "barcode": "7790272000954",
+        "name": "Natura Aceite De Oliva Rocío Vegetal 120 Cc",
+        "lastPrice": "",
+        "metadata": {
+          "brand": "Natura",
+          "quantityLabel": "120 Cc",
+          "category": "",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/212704937.jpeg",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=7790272000954",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "updatedAt": "2026-06-01T20:33:03.187Z"
+      },
+      {
+        "id": "product-1780345991057-819633e928767",
+        "key": "7790272000831",
+        "barcode": "7790272000831",
+        "name": "Natura Aceite Girasol Rocio Vegetal Aerosol 120 Gr",
+        "lastPrice": "",
+        "metadata": {
+          "brand": "Natura",
+          "quantityLabel": "",
+          "category": "",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/246972962.jpeg",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=7790272000831",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "updatedAt": "2026-06-01T20:33:11.057Z"
+      },
+      {
+        "id": "product-1780345998523-76655ae1c63808",
+        "key": "8001440121289",
+        "barcode": "8001440121289",
+        "name": "Cirio Passata Sieved Tomatoes 1000g",
+        "lastPrice": "",
+        "metadata": {
+          "brand": "Cirio",
+          "quantityLabel": "1000g",
+          "category": "Alimentos",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/354010290.webp",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=8001440121289",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "updatedAt": "2026-06-01T20:33:18.523Z",
+        "category": "Alimentos"
+      },
+      {
+        "id": "product-1780346011787-9682cdd24502",
+        "key": "7791130963633",
+        "barcode": "7791130963633",
+        "name": "Procenex - Limpia Pisos Frescura de Gardenia 1.8 l",
+        "lastPrice": "",
+        "metadata": {
+          "brand": "Procenex",
+          "quantityLabel": "1.8 l",
+          "category": "Limpieza / Limpia pisos",
+          "productType": "catalogo argentino",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/426543272.webp",
+          "source": "Catalogo argentino + Go-UPC",
+          "priceReference": {
+            "bestPrice": 3150,
+            "averagePrice": 4321.66,
+            "dealPrice": 3150,
+            "source": "Pricely",
+            "url": "https://pricely.ar/product/7791130963633",
+            "checkedAt": "2026-05-31"
+          },
+          "company": "Procenex",
+          "brandSource": "Base de marcas Argentina"
+        },
+        "updatedAt": "2026-06-01T20:33:31.787Z"
+      },
+      {
+        "id": "product-1780346018289-7b2a103d86ba58",
+        "key": "7793253003807",
+        "barcode": "7793253003807",
+        "name": "Ayudin - Lavandina en Gel Citrica 700 ml",
+        "lastPrice": "",
+        "metadata": {
+          "brand": "Ayudin",
+          "quantityLabel": "700 ml",
+          "category": "Limpieza / Lavandina en gel",
+          "productType": "catalogo argentino",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/338882809.png",
+          "source": "Catalogo argentino + Go-UPC",
+          "priceReference": {
+            "bestPrice": 2161.25,
+            "averagePrice": 3737.86,
+            "dealPrice": 2325.01,
+            "source": "Pricely",
+            "url": "https://pricely.ar/product/7793253003807",
+            "checkedAt": "2026-05-31"
+          },
+          "company": "Grupo Ayudin",
+          "brandSource": "Base de marcas Argentina"
+        },
+        "updatedAt": "2026-06-01T20:33:38.289Z"
+      },
+      {
+        "id": "product-1780346030676-25d4d95384083",
+        "key": "7790580135454",
+        "barcode": "7790580135454",
+        "name": "BC Mayonesa La Campagnola Light 500 G",
+        "lastPrice": "",
+        "metadata": {
+          "brand": "BC",
+          "quantityLabel": "500 G",
+          "category": "Alimentos",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/244615590.jpeg",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=7790580135454",
+          "company": "Grupo Arcor",
+          "brandSource": "Base de marcas Argentina",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "updatedAt": "2026-06-01T20:33:50.676Z"
+      }
+    ],
+    "purchases": [
+      {
+        "id": "purchase-1780345964501-73ce2a9da246e8",
+        "startedAt": "2026-06-01T20:32:44.501Z",
+        "closedAt": null,
+        "status": "open",
+        "items": []
+      }
+    ],
+    "shoppingList": [],
+    "stock": [
+      {
+        "id": "stock-1780345976100-918efea285aec8",
+        "barcode": "7790520028655",
+        "name": "Raid - Mata Moscas y Mosquitos Aerosol 380 ml",
+        "quantity": 3,
+        "minStock": 1,
+        "metadata": {
+          "brand": "Raid",
+          "quantityLabel": "380 ml",
+          "category": "Limpieza / Insecticida",
+          "productType": "catalogo argentino",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/107152283.jpeg",
+          "source": "Catalogo argentino + Go-UPC",
+          "priceReference": {
+            "bestPrice": 5700,
+            "averagePrice": 7084.14,
+            "dealPrice": 7160,
+            "source": "Pricely",
+            "url": "https://pricely.ar/product/7790520028655",
+            "checkedAt": "2026-05-31"
+          },
+          "company": "SC Johnson",
+          "brandSource": "Base de marcas Argentina"
+        },
+        "category": "Limpieza",
+        "updatedAt": "2026-06-01T20:32:56.101Z"
+      },
+      {
+        "id": "stock-1780345985316-a04e2dd1ba03a",
+        "barcode": "7790272000954",
+        "name": "Natura Aceite De Oliva Rocío Vegetal 120 Cc",
+        "quantity": 3,
+        "minStock": 1,
+        "metadata": {
+          "brand": "Natura",
+          "quantityLabel": "120 Cc",
+          "category": "",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/212704937.jpeg",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=7790272000954",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "category": "Almacen",
+        "updatedAt": "2026-06-01T20:33:05.317Z"
+      },
+      {
+        "id": "stock-1780345993007-8d209497e93b18",
+        "barcode": "7790272000831",
+        "name": "Natura Aceite Girasol Rocio Vegetal Aerosol 120 Gr",
+        "quantity": 3,
+        "minStock": 1,
+        "metadata": {
+          "brand": "Natura",
+          "quantityLabel": "",
+          "category": "",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/246972962.jpeg",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=7790272000831",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "category": "Almacen",
+        "updatedAt": "2026-06-01T20:33:13.007Z"
+      },
+      {
+        "id": "stock-1780346000264-020663e284e418",
+        "barcode": "8001440121289",
+        "name": "Cirio Passata Sieved Tomatoes 1000g",
+        "quantity": 3,
+        "minStock": 1,
+        "metadata": {
+          "brand": "Cirio",
+          "quantityLabel": "1000g",
+          "category": "Alimentos",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/354010290.webp",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=8001440121289",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "category": "Alimentos",
+        "updatedAt": "2026-06-01T20:33:20.264Z"
+      },
+      {
+        "id": "stock-1780346014119-336fa73a1649d8",
+        "barcode": "7791130963633",
+        "name": "Procenex - Limpia Pisos Frescura de Gardenia 1.8 l",
+        "quantity": 3,
+        "minStock": 1,
+        "metadata": {
+          "brand": "Procenex",
+          "quantityLabel": "1.8 l",
+          "category": "Limpieza / Limpia pisos",
+          "productType": "catalogo argentino",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/426543272.webp",
+          "source": "Catalogo argentino + Go-UPC",
+          "priceReference": {
+            "bestPrice": 3150,
+            "averagePrice": 4321.66,
+            "dealPrice": 3150,
+            "source": "Pricely",
+            "url": "https://pricely.ar/product/7791130963633",
+            "checkedAt": "2026-05-31"
+          },
+          "company": "Procenex",
+          "brandSource": "Base de marcas Argentina"
+        },
+        "category": "Limpieza",
+        "updatedAt": "2026-06-01T20:33:34.119Z"
+      },
+      {
+        "id": "stock-1780346020772-6f40cfaf0b5bb",
+        "barcode": "7793253003807",
+        "name": "Ayudin - Lavandina en Gel Citrica 700 ml",
+        "quantity": 3,
+        "minStock": 1,
+        "metadata": {
+          "brand": "Ayudin",
+          "quantityLabel": "700 ml",
+          "category": "Limpieza / Lavandina en gel",
+          "productType": "catalogo argentino",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/338882809.png",
+          "source": "Catalogo argentino + Go-UPC",
+          "priceReference": {
+            "bestPrice": 2161.25,
+            "averagePrice": 3737.86,
+            "dealPrice": 2325.01,
+            "source": "Pricely",
+            "url": "https://pricely.ar/product/7793253003807",
+            "checkedAt": "2026-05-31"
+          },
+          "company": "Grupo Ayudin",
+          "brandSource": "Base de marcas Argentina"
+        },
+        "category": "Limpieza",
+        "updatedAt": "2026-06-01T20:33:40.772Z"
+      },
+      {
+        "id": "stock-1780346032598-7cf54d4ac0b038",
+        "barcode": "7790580135454",
+        "name": "BC Mayonesa La Campagnola Light 500 G",
+        "quantity": 3,
+        "minStock": 1,
+        "metadata": {
+          "brand": "BC",
+          "quantityLabel": "500 G",
+          "category": "Alimentos",
+          "productType": "base global de codigos",
+          "imageUrl": "https://go-upc.s3.amazonaws.com/images/244615590.jpeg",
+          "source": "Go-UPC",
+          "sourceUrl": "https://go-upc.com/search?q=7790580135454",
+          "company": "Grupo Arcor",
+          "brandSource": "Base de marcas Argentina",
+          "priceReference": {
+            "source": "SEPA / Datos Abiertos",
+            "url": "https://datos.produccion.gob.ar/dataset/6f47ec76-d1ce-4e34-a7e1-621fe9b1d0b5/resource/0a9069a9-06e8-4f98-874d-da5578693290/download/sepa_lunes.zip",
+            "checkedAt": "2026-06-01",
+            "datasetName": "Lunes",
+            "official": true
+          }
+        },
+        "category": "Alimentos",
+        "updatedAt": "2026-06-01T20:33:52.598Z"
+      }
+    ]
+  }
+}

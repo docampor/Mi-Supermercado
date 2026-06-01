@@ -202,6 +202,8 @@ async function run() {
   })), missingPhotoBarcode);
   await page.reload({ waitUntil: "networkidle" });
 
+  const homeText = await page.locator("#view-home").innerText();
+  await page.getByRole("button", { name: "Compra", exact: true }).click();
   await page.getByRole("button", { name: "Cargar manual" }).click();
   await page.locator("#barcodeInput").fill(testBarcode);
   await page.evaluate(() => window.fillProductFromBarcode(true));
@@ -395,6 +397,7 @@ async function run() {
 
   const checks = {
     appTitle: bodyText.includes("Control de Stock"),
+    homeVisible: homeText.includes("Inicio") && homeText.includes("Ir de compras") && homeText.includes("Para mirar antes de salir"),
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
     categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Limpieza") && stockText.includes("Lacteos"),
@@ -427,6 +430,7 @@ async function run() {
         Boolean(document.querySelector("#scannerResult")) && Boolean(document.querySelector("#scannerQuantityBox")) &&
         Boolean(document.querySelector("#scannerConfirmActions")) &&
         Boolean(document.querySelector("#finishScannerButton")) &&
+        Boolean(document.querySelector("#scannerSessionSummary")) &&
         firstRead === false && secondRead === false && thirdRead === true &&
         !confirmSource.includes("closeScanner()");
     }),
