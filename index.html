@@ -143,7 +143,7 @@
               </button>
               <button class="secondary" id="exportBackupButton" type="button">
                 <svg class="icon" aria-hidden="true"><use href="#icon-download"></use></svg>
-                Backup
+                Compartir backup
               </button>
               <button class="secondary" id="importBackupButton" type="button">
                 <svg class="icon" aria-hidden="true"><use href="#icon-upload"></use></svg>
@@ -159,11 +159,11 @@
           <div class="report-tools">
             <button class="secondary" id="shareListButton" type="button">
               <svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
-              Lista imprimible
+              Lista PDF
             </button>
             <button class="secondary" id="shareStockButton" type="button">
               <svg class="icon" aria-hidden="true"><use href="#icon-box"></use></svg>
-              Stock imprimible
+              Stock PDF
             </button>
             <button class="danger" id="clearDataButton" type="button">
               <svg class="icon" aria-hidden="true"><use href="#icon-trash"></use></svg>
@@ -226,6 +226,10 @@
         <label>
           Producto
           <input id="productNameInput" autocomplete="off" required placeholder="Nombre del producto">
+        </label>
+        <label>
+          Categoria
+          <select id="productCategoryInput"></select>
         </label>
         <div class="two-cols">
           <label>

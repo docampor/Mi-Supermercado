@@ -244,7 +244,9 @@ async function run() {
   await page.getByPlaceholder("Mayonesa, fideos, limpiador...").fill("Mayonesa");
   await page.locator("#listQtyInput").fill("1");
   await page.getByRole("button", { name: "Agregar" }).click();
+  await page.locator("#shoppingList .category-select").selectOption("Limpieza");
   const listActionText = await page.locator("#shoppingList").innerText();
+  const listCategoryGroups = await page.locator("#shoppingList details.category-group").count();
 
   await page.getByRole("button", { name: "Compra", exact: true }).click();
   await page.getByRole("button", { name: "Cargar manual" }).click();
@@ -320,6 +322,7 @@ async function run() {
   await page.getByRole("button", { name: "Guardar" }).click();
   await page.waitForFunction(() => document.querySelector("#lowStockPanel:not([hidden])")?.textContent.includes("Leche"), null, { timeout: 5000 });
   const stockText = await page.locator("#stockList").innerText();
+  const stockCategoryGroups = await page.locator("#stockList details.category-group").count();
   const lowStockText = await page.locator("#lowStockPanel").innerText();
   await page.locator("#addLowStockToListButton").click();
   await page.getByRole("button", { name: "Lista", exact: true }).click();
@@ -338,13 +341,13 @@ async function run() {
   const listReportDownload = await listReportDownloadPromise;
   const listReportFilename = listReportDownload.suggestedFilename();
   const listReportPath = await listReportDownload.path();
-  const listReportText = fs.readFileSync(listReportPath, "utf8");
+  const listReportText = fs.readFileSync(listReportPath, "latin1");
   const stockReportDownloadPromise = page.waitForEvent("download");
   await page.locator("#shareStockButton").click();
   const stockReportDownload = await stockReportDownloadPromise;
   const stockReportFilename = stockReportDownload.suggestedFilename();
   const stockReportPath = await stockReportDownload.path();
-  const stockReportText = fs.readFileSync(stockReportPath, "utf8");
+  const stockReportText = fs.readFileSync(stockReportPath, "latin1");
   const productThumbCountBeforeImport = await page.locator(".product-thumb").count();
   const backupDownloadPromise = page.waitForEvent("download");
   await page.locator("#exportBackupButton").click();
@@ -394,12 +397,17 @@ async function run() {
     appTitle: bodyText.includes("Control de Stock"),
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
-    categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Almacen") && stockText.includes("Lacteos"),
+    categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Limpieza") && stockText.includes("Lacteos"),
+    categoryGroupsVisible: listCategoryGroups > 0 && stockCategoryGroups > 0,
+    categoryChangeSaved: listActionText.includes("Limpieza") && !listActionText.includes("Almacen\n1 producto"),
     listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
     lowStockVisible: lowStockText.includes("Para reponer") && lowStockText.includes("Leche") && lowStockText.includes("Minimo"),
     restockListAdded: restockListText.includes("Leche") && restockListText.includes("Escanear codigo"),
-    printableReports: listReportFilename.includes("lista-compras") && stockReportFilename.includes("stock-actual") &&
-      listReportText.includes("[") && listReportText.includes("Mayonesa") && stockReportText.includes("[") && stockReportText.includes("Leche"),
+    printableReports: listReportFilename.endsWith(".pdf") && stockReportFilename.endsWith(".pdf") &&
+      listReportText.startsWith("%PDF") && listReportText.includes("Mayonesa") &&
+      listReportText.includes("Cantidad") && listReportText.includes("Marca") &&
+      stockReportText.startsWith("%PDF") && stockReportText.includes("Leche") &&
+      stockReportText.includes("Minimo") && stockReportText.includes("Estado"),
     clearDataVisible: bodyText.includes("Limpiar datos"),
     backupExported: backupFilename.endsWith(".json") && backupFilename.includes("control-stock-backup"),
     backupImported: importedState.shoppingList.some((item) => item.name === "Cafe importado") &&
@@ -421,7 +429,7 @@ async function run() {
     sepaDatasetVisible: brandDatabaseText.includes("SEPA") || catalogPriceText.includes("SEPA"),
     newCatalogProductsVisible: newCatalogResults.every((item) => item.image && item.price),
     brandSourcesVisible: brandSourceResults.every((item) => item.found),
-    brandDatabaseVisible: brandDatabaseText.includes("Matarazzo") && brandDatabaseText.includes("Molinos"),
+    brandDatabaseVisible: brandDatabaseText.toLowerCase().includes("matarazzo") && brandDatabaseText.includes("Molinos"),
     imageSaved: productThumbCountBeforeImport > 0
   };
 

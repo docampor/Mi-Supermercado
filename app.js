@@ -231,6 +231,18 @@ const ARGENTINA_BRAND_DATABASE = [
 const SEPA_DATASET_API = "https://datos.produccion.gob.ar/api/3/action/package_show?id=sepa-precios";
 const GO_UPC_READER_BASE = "https://r.jina.ai/";
 const GO_UPC_SEARCH_BASE = "https://go-upc.com/search?q=";
+const PRODUCT_CATEGORIES = [
+  "Almacen",
+  "Bebidas",
+  "Lacteos",
+  "Frescos",
+  "Limpieza",
+  "Perfumeria",
+  "Panaderia",
+  "Congelados",
+  "Mascotas",
+  "Otros"
+];
 let sepaDatasetReferencePromise = null;
 
 const $ = (selector) => document.querySelector(selector);
@@ -258,6 +270,7 @@ const els = {
   productPhotoInput: $("#productPhotoInput"),
   barcodeInput: $("#barcodeInput"),
   productNameInput: $("#productNameInput"),
+  productCategoryInput: $("#productCategoryInput"),
   quantityInput: $("#quantityInput"),
   unitPriceInput: $("#unitPriceInput"),
   promoEnabledInput: $("#promoEnabledInput"),
@@ -324,6 +337,10 @@ function bindEvents() {
   els.barcodeInput.addEventListener("change", fillProductFromBarcode);
   els.barcodeInput.addEventListener("blur", fillProductFromBarcode);
   els.barcodeInput.addEventListener("input", queueBarcodeLookup);
+  els.productNameInput.addEventListener("input", updateProductDialogCategory);
+  els.productCategoryInput.addEventListener("change", () => {
+    els.productForm.dataset.categoryTouched = "1";
+  });
   els.promoEnabledInput.addEventListener("change", updatePromoVisibility);
   els.stockSearchInput.addEventListener("input", renderStock);
   els.reportMonthInput.addEventListener("change", renderReports);
@@ -481,7 +498,11 @@ function renderPurchase() {
     return;
   }
 
-  els.purchaseItems.innerHTML = active.items.map((item) => `
+  els.purchaseItems.innerHTML = renderCategoryGroups(active.items, renderPurchaseItem, (items) => currency.format(items.reduce((sum, item) => sum + Number(item.total || 0), 0)));
+}
+
+function renderPurchaseItem(item) {
+  return `
     <article class="item-card">
       <div class="item-main">
         <div class="item-identity">
@@ -489,7 +510,7 @@ function renderPurchase() {
           <div>
             <strong>${escapeHtml(item.name)}</strong>
             <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
-            <span class="category-pill">${escapeHtml(inferProductCategory(item.name, item.metadata))}</span>
+            ${categoryControl("purchase", item)}
           </div>
         </div>
         <div class="price">${currency.format(item.total)}</div>
@@ -503,7 +524,7 @@ function renderPurchase() {
         <button class="danger small" onclick="removePurchaseItem('${item.id}')">Eliminar</button>
       </div>
     </article>
-  `).join("");
+  `;
 }
 
 function scanForPurchase(listItemId = null) {
@@ -517,24 +538,29 @@ function scanForPurchase(listItemId = null) {
       name: product?.name || listItem?.name || "",
       quantity: scannedQuantity,
       unitPrice: product?.lastPrice || 0,
-      productInfo: product
+      productInfo: product,
+      category: listItem?.category
     });
   });
 }
 
 function openProductDialog(options = {}) {
   const product = options.barcode ? findProductByBarcode(options.barcode) : null;
+  const metadata = options.productInfo?.metadata || product?.metadata || {};
   activeProductContext = options.context || "purchase";
   els.productDialogMode.textContent = activeProductContext === "stock" ? "Stock" : "Compra";
   els.barcodeInput.value = options.barcode || "";
   els.productNameInput.value = options.name || product?.name || "";
+  const category = options.category || firstCategory(metadata.category) || inferProductCategory(els.productNameInput.value, metadata);
+  els.productForm.dataset.categoryTouched = options.category ? "1" : "";
+  renderProductCategoryOptions(category);
   els.quantityInput.value = options.quantity || 1;
   els.unitPriceInput.value = options.unitPrice ?? product?.lastPrice ?? "";
   els.promoEnabledInput.checked = Boolean(options.promo?.enabled);
   els.promoQtyInput.value = options.promo?.quantity || "";
   els.promoPriceInput.value = options.promo?.price || "";
   els.productForm.dataset.editItemId = options.editItemId || "";
-  els.productForm.dataset.productMetadata = JSON.stringify(options.productInfo?.metadata || product?.metadata || {});
+  els.productForm.dataset.productMetadata = JSON.stringify(metadata);
   els.productPhotoInput.value = "";
   renderLookupInfo(options.productInfo || product);
   updatePromoVisibility();
@@ -543,6 +569,12 @@ function openProductDialog(options = {}) {
   setTimeout(() => {
     (els.productNameInput.value ? els.quantityInput : els.productNameInput).focus();
   }, 80);
+}
+
+function updateProductDialogCategory() {
+  if (els.productForm.dataset.categoryTouched === "1") return;
+  const metadata = readProductMetadata();
+  renderProductCategoryOptions(inferProductCategory(els.productNameInput.value, metadata));
 }
 
 function queueBarcodeLookup() {
@@ -567,7 +599,9 @@ function editPurchaseItem(itemId) {
     name: item.name,
     quantity: item.quantity,
     unitPrice: item.unitPrice,
-    promo: item.promo
+    promo: item.promo,
+    category: getItemCategory(item),
+    productInfo: { metadata: item.metadata || {} }
   });
 }
 
@@ -588,7 +622,9 @@ function addScannedProductToPurchase(options) {
   const quantity = Math.max(0.01, parseNumber(options.quantity) || 1);
   const unitPrice = parseNumber(options.unitPrice);
   const promo = { enabled: false, quantity: 0, price: 0 };
-  const metadata = product?.metadata || {};
+  const metadata = { ...(product?.metadata || {}) };
+  const category = getItemCategory({ name, metadata, category: options.category });
+  metadata.category = category;
   const total = calculateTotal(quantity, unitPrice, promo);
 
   upsertProduct({ barcode, name, lastPrice: unitPrice, metadata });
@@ -601,6 +637,7 @@ function addScannedProductToPurchase(options) {
     promo,
     total,
     metadata,
+    category,
     createdAt: new Date().toISOString()
   });
   adjustStock(name, barcode, quantity, false);
@@ -622,7 +659,9 @@ function saveProductEntry(event) {
   const quantity = parseNumber(els.quantityInput.value);
   const unitPrice = parseNumber(els.unitPriceInput.value);
   const promo = getPromoInput();
-  const metadata = readProductMetadata();
+  const metadata = { ...readProductMetadata() };
+  const category = els.productCategoryInput.value || inferProductCategory(name, metadata);
+  metadata.category = category;
 
   if (!name || quantity <= 0 || unitPrice < 0) {
     toast("Revisa producto, cantidad y precio.");
@@ -634,6 +673,7 @@ function saveProductEntry(event) {
 
   if (activeProductContext === "stock") {
     const stockItem = adjustStock(name, barcode, quantity, true);
+    setItemCategory(stockItem, category);
     maybeNotifyLowStock(stockItem);
     saveState();
     els.productDialog.close();
@@ -648,7 +688,7 @@ function saveProductEntry(event) {
     const existing = active.items.find((item) => item.id === editItemId);
     if (existing) {
       adjustStock(existing.name, existing.barcode, -Number(existing.quantity || 0), false);
-      Object.assign(existing, { barcode, name, quantity, unitPrice, promo, total, metadata, updatedAt: new Date().toISOString() });
+      Object.assign(existing, { barcode, name, quantity, unitPrice, promo, total, metadata, category, updatedAt: new Date().toISOString() });
       adjustStock(name, barcode, quantity, false);
     }
   } else {
@@ -661,6 +701,7 @@ function saveProductEntry(event) {
       promo,
       total,
       metadata,
+      category,
       createdAt: new Date().toISOString()
     });
     adjustStock(name, barcode, quantity, false);
@@ -880,6 +921,104 @@ function inferProductCategory(name, metadata = {}) {
 
   const match = rules.find(([, words]) => words.some((word) => normalized.includes(word)));
   return match?.[0] || "Otros";
+}
+
+function getItemCategory(item) {
+  return firstCategory(item?.category) || inferProductCategory(item?.name, item?.metadata || {});
+}
+
+function categoryOrder(category) {
+  const index = PRODUCT_CATEGORIES.indexOf(category);
+  return index === -1 ? PRODUCT_CATEGORIES.length : index;
+}
+
+function ensureCategoryOption(category) {
+  const cleanCategory = firstCategory(category) || "Otros";
+  return PRODUCT_CATEGORIES.includes(cleanCategory) ? cleanCategory : "Otros";
+}
+
+function renderProductCategoryOptions(selectedCategory) {
+  const selected = ensureCategoryOption(selectedCategory);
+  els.productCategoryInput.innerHTML = PRODUCT_CATEGORIES.map((category) => (
+    `<option value="${escapeHtml(category)}"${category === selected ? " selected" : ""}>${escapeHtml(category)}</option>`
+  )).join("");
+}
+
+function categoryControl(scope, item) {
+  const selected = ensureCategoryOption(getItemCategory(item));
+  const options = PRODUCT_CATEGORIES.map((category) => (
+    `<option value="${escapeHtml(category)}"${category === selected ? " selected" : ""}>${escapeHtml(category)}</option>`
+  )).join("");
+
+  return `
+    <label class="category-control">
+      <span>Rubro</span>
+      <select class="category-select" onchange="changeItemCategory('${scope}', '${item.id}', this.value)">
+        ${options}
+      </select>
+    </label>
+  `;
+}
+
+function renderCategoryGroups(items, renderCard, metricRenderer = null) {
+  const groups = new Map();
+  items.forEach((item) => {
+    const category = getItemCategory(item);
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(item);
+  });
+
+  return [...groups.entries()]
+    .sort(([categoryA], [categoryB]) => categoryOrder(categoryA) - categoryOrder(categoryB) || categoryA.localeCompare(categoryB, "es"))
+    .map(([category, groupItems]) => `
+      <details class="category-group" open>
+        <summary class="category-summary">
+          <span>${escapeHtml(category)}</span>
+          <small>${formatNumber(groupItems.length)} ${groupItems.length === 1 ? "producto" : "productos"}${metricRenderer ? ` | ${escapeHtml(metricRenderer(groupItems))}` : ""}</small>
+        </summary>
+        <div class="category-items">
+          ${groupItems.map(renderCard).join("")}
+        </div>
+      </details>
+    `).join("");
+}
+
+function setItemCategory(item, category) {
+  if (!item) return;
+  const cleanCategory = ensureCategoryOption(category);
+  item.category = cleanCategory;
+  item.metadata = { ...(item.metadata || {}), category: cleanCategory };
+}
+
+function syncCategoryAcrossProduct(item, category) {
+  const cleanCategory = ensureCategoryOption(category);
+  const normalized = normalize(item?.name);
+  const matchesItem = (entry) => (item?.barcode && entry.barcode === item.barcode) || (normalized && normalize(entry.name) === normalized);
+
+  [...state.products, ...state.shoppingList, ...state.stock].forEach((entry) => {
+    if (matchesItem(entry)) setItemCategory(entry, cleanCategory);
+  });
+
+  state.purchases.forEach((purchase) => {
+    purchase.items?.forEach((entry) => {
+      if (matchesItem(entry)) setItemCategory(entry, cleanCategory);
+    });
+  });
+}
+
+function changeItemCategory(scope, itemId, category) {
+  const active = getActivePurchase();
+  const collections = {
+    purchase: active?.items || [],
+    list: state.shoppingList,
+    stock: state.stock
+  };
+  const item = collections[scope]?.find((entry) => entry.id === itemId);
+  if (!item) return;
+  syncCategoryAcrossProduct(item, category);
+  saveState();
+  render();
+  toast("Categoria actualizada.");
 }
 
 function firstCategory(value) {
@@ -1359,6 +1498,9 @@ async function fillProductFromBarcode(force = false) {
   if (product?.name) {
     els.productNameInput.value = product.name;
     els.productForm.dataset.productMetadata = JSON.stringify(product.metadata || {});
+    if (els.productForm.dataset.categoryTouched !== "1") {
+      renderProductCategoryOptions(inferProductCategory(product.name, product.metadata || {}));
+    }
   }
   renderLookupInfo(product);
 }
@@ -1503,12 +1645,13 @@ function addShoppingListItem(event) {
   renderShoppingList();
 }
 
-function addShoppingListEntry(name, quantity = "") {
+function addShoppingListEntry(name, quantity = "", category = "", metadata = {}) {
   const normalized = normalize(name);
   const existing = state.shoppingList.find((item) => normalize(item.name) === normalized);
   if (existing) {
     existing.quantity = existing.quantity || String(quantity || "");
-    existing.category = existing.category || inferProductCategory(existing.name);
+    existing.category = category || existing.category || inferProductCategory(existing.name, existing.metadata);
+    existing.metadata = { ...(existing.metadata || {}), ...metadata };
     existing.updatedAt = new Date().toISOString();
     return existing;
   }
@@ -1517,7 +1660,8 @@ function addShoppingListEntry(name, quantity = "") {
     id: uid("list"),
     name,
     quantity: String(quantity || ""),
-    category: inferProductCategory(name),
+    category: category || inferProductCategory(name, metadata),
+    metadata,
     checked: false,
     createdAt: new Date().toISOString()
   };
@@ -1531,13 +1675,17 @@ function renderShoppingList() {
     return;
   }
 
-  els.shoppingList.innerHTML = state.shoppingList.map((item) => `
+  els.shoppingList.innerHTML = renderCategoryGroups(state.shoppingList, renderShoppingListItem);
+}
+
+function renderShoppingListItem(item) {
+  return `
     <article class="item-card">
       <div class="item-main">
         <div>
           <strong>${escapeHtml(item.name)}</strong>
           <small>${item.quantity ? `Cantidad: ${escapeHtml(item.quantity)}` : "Sin cantidad"}</small>
-          <span class="category-pill">${escapeHtml(inferProductCategory(item.name, item.metadata))}</span>
+          ${categoryControl("list", item)}
         </div>
       </div>
       <div class="card-actions">
@@ -1547,7 +1695,7 @@ function renderShoppingList() {
         <button class="danger small" onclick="deleteListItem('${item.id}')">${svgIcon("trash")} Eliminar</button>
       </div>
     </article>
-  `).join("");
+  `;
 }
 
 function sendListItemToPurchase(itemId) {
@@ -1557,7 +1705,9 @@ function sendListItemToPurchase(itemId) {
   openProductDialog({
     context: "purchase",
     name: item.name,
-    quantity: parseNumber(item.quantity) || 1
+    quantity: parseNumber(item.quantity) || 1,
+    category: getItemCategory(item),
+    productInfo: { metadata: item.metadata || {} }
   });
 }
 
@@ -1575,6 +1725,7 @@ function editListItem(itemId) {
   const quantity = prompt("Cantidad", item.quantity || "");
   item.name = name.trim() || item.name;
   item.quantity = quantity === null ? item.quantity : quantity.trim();
+  item.category = item.category || inferProductCategory(item.name, item.metadata);
   saveState();
   renderShoppingList();
 }
@@ -1619,7 +1770,7 @@ function adjustStock(name, barcode, quantity, replace, minStock = null) {
     item.quantity = replace ? quantity : Math.max(0, Number(item.quantity || 0) + quantity);
     item.minStock = normalizeMinStock(minStock, item.minStock);
     item.metadata = { ...(item.metadata || {}), ...(product?.metadata || {}) };
-    item.category = inferProductCategory(name, item.metadata);
+    item.category = item.category || inferProductCategory(name, item.metadata);
     item.updatedAt = new Date().toISOString();
     return item;
   } else {
@@ -1643,14 +1794,18 @@ function renderStock() {
   const query = normalize(els.stockSearchInput.value);
   const rows = state.stock
     .filter((item) => !query || normalize(item.name).includes(query) || item.barcode?.includes(query))
-    .sort((a, b) => a.name.localeCompare(b.name, "es"));
+    .sort((a, b) => getItemCategory(a).localeCompare(getItemCategory(b), "es") || a.name.localeCompare(b.name, "es"));
 
   if (rows.length === 0) {
     els.stockList.innerHTML = emptyState(query ? "No encontre productos con esa busqueda." : "Todavia no cargaste stock.");
     return;
   }
 
-  els.stockList.innerHTML = rows.map((item) => `
+  els.stockList.innerHTML = renderCategoryGroups(rows, renderStockItem, (items) => `${formatNumber(items.reduce((sum, item) => sum + Number(item.quantity || 0), 0))} unidades`);
+}
+
+function renderStockItem(item) {
+  return `
     <article class="item-card ${isLowStock(item) ? "stock-alert" : ""}">
       <div class="item-main">
         <div class="item-identity">
@@ -1659,7 +1814,7 @@ function renderStock() {
             <strong>${escapeHtml(item.name)}</strong>
             <small>${item.barcode ? `Codigo ${escapeHtml(item.barcode)}` : "Sin codigo"}</small>
             <small>Minimo: ${formatNumber(getMinStock(item))}</small>
-            <span class="category-pill">${escapeHtml(inferProductCategory(item.name, item.metadata))}</span>
+            ${categoryControl("stock", item)}
             ${isLowStock(item) ? "<span class=\"stock-badge\">Reponer</span>" : ""}
           </div>
         </div>
@@ -1672,7 +1827,7 @@ function renderStock() {
         <button class="danger small" onclick="deleteStock('${item.id}')">${svgIcon("trash")} Eliminar</button>
       </div>
     </article>
-  `).join("");
+  `;
 }
 
 function changeStock(itemId, delta) {
@@ -1725,7 +1880,7 @@ function addLowStockToList() {
     return;
   }
 
-  lowStockItems.forEach((item) => addShoppingListEntry(item.name, suggestedRestockQuantity(item)));
+  lowStockItems.forEach((item) => addShoppingListEntry(item.name, suggestedRestockQuantity(item), getItemCategory(item), item.metadata || {}));
   saveState();
   renderShoppingList();
   toast("Faltantes agregados a la lista.");
@@ -1734,7 +1889,7 @@ function addLowStockToList() {
 function addStockItemToList(itemId) {
   const item = state.stock.find((entry) => entry.id === itemId);
   if (!item) return;
-  addShoppingListEntry(item.name, suggestedRestockQuantity(item));
+  addShoppingListEntry(item.name, suggestedRestockQuantity(item), getItemCategory(item), item.metadata || {});
   saveState();
   renderShoppingList();
   toast("Producto agregado a la lista.");
@@ -2065,7 +2220,7 @@ function exportExcel() {
       <body>
         ${tableHtml("Compras", rows, ["fecha", "codigo", "producto", "marca", "presentacion", "categoria", "cantidad", "precioUnitario", "promocion", "total"])}
         ${tableHtml("Stock", state.stock, ["barcode", "name", "quantity", "minStock", "updatedAt"])}
-        ${tableHtml("Lista", state.shoppingList.map((item) => ({ ...item, category: inferProductCategory(item.name, item.metadata) })), ["category", "name", "quantity", "createdAt"])}
+        ${tableHtml("Lista", state.shoppingList.map((item) => ({ ...item, category: getItemCategory(item) })), ["category", "name", "quantity", "createdAt"])}
       </body>
     </html>
   `;
@@ -2074,7 +2229,7 @@ function exportExcel() {
   toast("Archivo Excel generado.");
 }
 
-function exportBackup() {
+async function exportBackup() {
   const backup = {
     app: "control-stock",
     version: 1,
@@ -2082,68 +2237,264 @@ function exportBackup() {
     data: cloneState(state)
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
-  downloadBlob(blob, `control-stock-backup-${dateFileKey(new Date())}.json`);
-  toast("Backup generado para compartir.");
+  const filename = `control-stock-backup-${dateFileKey(new Date())}.json`;
+  await shareFileOrDownload({
+    blob,
+    filename,
+    title: "Backup Control de Stock",
+    text: "Backup local de Control de Stock para importar en otro celular.",
+    sharedMessage: "Backup listo para compartir.",
+    downloadedMessage: "Backup descargado para compartir."
+  });
 }
 
 function shareShoppingListReport() {
-  const lines = state.shoppingList.length
-    ? groupedReportLines(state.shoppingList, (item) => ({
-        category: inferProductCategory(item.name, item.metadata),
-        line: `${item.name}${item.quantity ? ` - cant. ${item.quantity}` : ""}`
-      }))
-    : ["Sin productos en la lista."];
-  shareOrDownloadReport("Lista de compras", lines, "lista-compras");
+  const rows = state.shoppingList.map((item) => ({
+    category: getItemCategory(item),
+    title: item.name,
+    quantity: item.quantity || "Sin cantidad",
+    barcode: item.barcode || "",
+    brand: item.metadata?.brand || "",
+    presentation: item.metadata?.quantityLabel || "",
+    image: item.metadata?.imageUrl ? "Si" : "No"
+  }));
+  sharePdfReport({
+    title: "Lista de compras",
+    filenamePrefix: "lista-compras",
+    emptyText: "Sin productos en la lista.",
+    rows,
+    columns: [
+      ["Cantidad", "quantity"],
+      ["Codigo", "barcode"],
+      ["Marca", "brand"],
+      ["Presentacion", "presentation"],
+      ["Foto", "image"]
+    ]
+  });
 }
 
 function shareStockReport() {
-  const lines = state.stock.length
-    ? groupedReportLines(state.stock, (item) => ({
-        category: inferProductCategory(item.name, item.metadata),
-        line: `${item.name} - ${formatNumber(item.quantity)} disp.`
-      }))
-    : ["Sin stock cargado."];
-  shareOrDownloadReport("Stock actual", lines, "stock-actual");
+  const rows = state.stock.map((item) => ({
+    category: getItemCategory(item),
+    title: item.name,
+    quantity: formatNumber(item.quantity),
+    minStock: formatNumber(getMinStock(item)),
+    status: isLowStock(item) ? "Reponer" : "OK",
+    barcode: item.barcode || "",
+    brand: item.metadata?.brand || "",
+    presentation: item.metadata?.quantityLabel || "",
+    image: item.metadata?.imageUrl ? "Si" : "No"
+  }));
+  sharePdfReport({
+    title: "Stock actual",
+    filenamePrefix: "stock-actual",
+    emptyText: "Sin stock cargado.",
+    rows,
+    columns: [
+      ["Disponible", "quantity"],
+      ["Minimo", "minStock"],
+      ["Estado", "status"],
+      ["Codigo", "barcode"],
+      ["Marca", "brand"],
+      ["Presentacion", "presentation"],
+      ["Foto", "image"]
+    ]
+  });
 }
 
-async function shareOrDownloadReport(title, lines, filenamePrefix) {
-  const text = [
-    title.toUpperCase(),
-    formatDateTime(new Date().toISOString()),
-    "",
-    ...lines
-  ].join("\n");
+async function sharePdfReport({ title, filenamePrefix, emptyText, rows, columns }) {
+  const blob = createPdfReport({ title, rows, columns, emptyText });
+  const filename = `${filenamePrefix}-${dateFileKey(new Date())}.pdf`;
+  await shareFileOrDownload({
+    blob,
+    filename,
+    title,
+    text: `${title} generado por Control de Stock.`,
+    sharedMessage: "PDF listo para compartir.",
+    downloadedMessage: "PDF generado para imprimir o compartir."
+  });
+}
 
-  if (navigator.share) {
+async function shareFileOrDownload({ blob, filename, title, text, sharedMessage, downloadedMessage }) {
+  const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
     try {
-      await navigator.share({ title, text });
-      toast("Listado compartido.");
+      await navigator.share({ title, text, files: [file] });
+      toast(sharedMessage);
       return;
     } catch (error) {
       if (error?.name === "AbortError") return;
     }
   }
 
-  downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), `${filenamePrefix}-${dateFileKey(new Date())}.txt`);
-  toast("Listado generado para imprimir o compartir.");
+  downloadBlob(blob, filename);
+  toast(downloadedMessage);
 }
 
-function groupedReportLines(items, mapper) {
-  const groups = new Map();
-  items.forEach((item) => {
-    const mapped = mapper(item);
-    const category = mapped.category || "Otros";
-    if (!groups.has(category)) groups.set(category, []);
-    groups.get(category).push(mapped.line);
+function createPdfReport({ title, rows, columns, emptyText }) {
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 36;
+  const contentWidth = pageWidth - margin * 2;
+  const pages = [];
+  let content = [];
+  let y = pageHeight - margin;
+
+  const push = (line) => content.push(line);
+  const color = (hex) => {
+    const value = hex.replace("#", "");
+    return [
+      parseInt(value.slice(0, 2), 16) / 255,
+      parseInt(value.slice(2, 4), 16) / 255,
+      parseInt(value.slice(4, 6), 16) / 255
+    ].map((part) => part.toFixed(3)).join(" ");
+  };
+  const text = (value, x, yy, size = 10, font = "F1", hex = "#17231f") => {
+    push(`BT /${font} ${size} Tf ${color(hex)} rg ${x.toFixed(2)} ${yy.toFixed(2)} Td (${pdfEscapeText(value)}) Tj ET`);
+  };
+  const rect = (x, yy, width, height, fillHex, strokeHex = "") => {
+    push(`${color(fillHex)} rg ${strokeHex ? `${color(strokeHex)} RG` : ""} ${x.toFixed(2)} ${yy.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re ${strokeHex ? "B" : "f"}`);
+  };
+  const line = (x1, y1, x2, y2, hex = "#d6cec0") => {
+    push(`${color(hex)} RG 0.75 w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
+  };
+  const finishPage = () => {
+    pages.push(content.join("\n"));
+    content = [];
+    y = pageHeight - margin;
+  };
+  const ensureSpace = (height) => {
+    if (y - height < margin) {
+      finishPage();
+      drawPageHeader(false);
+    }
+  };
+  const drawPageHeader = (firstPage) => {
+    rect(0, pageHeight - 92, pageWidth, 92, "#184c48");
+    text("CONTROL DE STOCK", margin, pageHeight - 44, 12, "F2", "#ffffff");
+    text(title.toUpperCase(), margin, pageHeight - 69, 20, "F2", "#ffffff");
+    text(`Generado: ${formatDateTime(new Date().toISOString())}`, pageWidth - 210, pageHeight - 44, 9, "F1", "#e8f2ee");
+    y = firstPage ? pageHeight - 122 : pageHeight - 112;
+  };
+  const drawCategory = (category, count) => {
+    ensureSpace(48);
+    rect(margin, y - 25, contentWidth, 28, "#e8f2ee", "#bad2ca");
+    text(category, margin + 12, y - 14, 12, "F2", "#184c48");
+    text(`${count} ${count === 1 ? "producto" : "productos"}`, pageWidth - margin - 108, y - 14, 9, "F2", "#5d6a65");
+    y -= 40;
+  };
+  const drawItem = (row) => {
+    const detailLines = columns
+      .map(([label, key]) => {
+        const value = row[key];
+        return `${label}: ${value || "-"}`;
+      })
+      .filter(Boolean);
+    const wrappedTitle = wrapPdfText(row.title, 66);
+    const wrappedDetails = wrapPdfText(detailLines.join(" | "), 92);
+    const cardHeight = Math.max(66, 22 + wrappedTitle.length * 13 + wrappedDetails.length * 12);
+    ensureSpace(cardHeight + 8);
+
+    rect(margin, y - cardHeight, contentWidth, cardHeight, "#fffdf8", "#d6cec0");
+    text(wrappedTitle[0], margin + 12, y - 18, 12, "F2", "#111817");
+    wrappedTitle.slice(1).forEach((part, index) => text(part, margin + 12, y - 32 - index * 13, 11, "F2", "#111817"));
+    const detailStart = y - 38 - Math.max(0, wrappedTitle.length - 1) * 13;
+    wrappedDetails.forEach((part, index) => text(part, margin + 12, detailStart - index * 12, 9, "F1", "#5d6a65"));
+    y -= cardHeight + 8;
+  };
+
+  drawPageHeader(true);
+
+  if (!rows.length) {
+    rect(margin, y - 56, contentWidth, 56, "#fffdf8", "#d6cec0");
+    text(emptyText, margin + 14, y - 32, 12, "F2", "#5d6a65");
+  } else {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const category = row.category || "Otros";
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category).push(row);
+    });
+
+    [...groups.entries()]
+      .sort(([a], [b]) => categoryOrder(a) - categoryOrder(b) || a.localeCompare(b, "es"))
+      .forEach(([category, groupRows]) => {
+        drawCategory(category, groupRows.length);
+        groupRows
+          .sort((a, b) => a.title.localeCompare(b.title, "es"))
+          .forEach(drawItem);
+      });
+  }
+
+  finishPage();
+  return buildPdfBlob(pages, pageWidth, pageHeight);
+}
+
+function wrapPdfText(value, maxChars) {
+  const words = String(value || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines = [];
+  let line = "";
+  words.forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length > maxChars && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  });
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
+function buildPdfBlob(pageContents, pageWidth, pageHeight) {
+  const objects = [];
+  const pageIds = pageContents.map((_, index) => 5 + index * 2);
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+  objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+  objects[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+
+  pageContents.forEach((pageContent, index) => {
+    const pageId = pageIds[index];
+    const contentId = pageId + 1;
+    objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
+    objects[contentId] = `<< /Length ${pageContent.length} >>\nstream\n${pageContent}\nendstream`;
   });
 
-  return Array.from(groups.entries())
-    .sort(([a], [b]) => a.localeCompare(b, "es"))
-    .flatMap(([category, lines]) => [
-      `[${category}]`,
-      ...lines.sort((a, b) => a.localeCompare(b, "es")).map((line) => `  - ${line}`),
-      ""
-    ]);
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (let index = 1; index < objects.length; index += 1) {
+    offsets[index] = pdf.length;
+    pdf += `${index} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let index = 1; index < objects.length; index += 1) {
+    pdf += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function pdfEscapeText(value) {
+  return String(value ?? "")
+    .replace(/[–—]/g, "-")
+    .replace(/[“”]/g, "\"")
+    .replace(/[‘’]/g, "'")
+    .replace(/€/g, "EUR")
+    .split("")
+    .map((char) => {
+      if (char === "\\") return "\\\\";
+      if (char === "(") return "\\(";
+      if (char === ")") return "\\)";
+      const code = char.charCodeAt(0);
+      if (code === 10 || code === 13) return " ";
+      if (code >= 32 && code <= 126) return char;
+      if (code <= 255) return `\\${code.toString(8).padStart(3, "0")}`;
+      return normalize(char).replace(/[^a-z0-9 ]/g, "") || "?";
+    })
+    .join("");
 }
 
 function clearAllData() {
@@ -2312,6 +2663,7 @@ window.closeProductDialog = closeProductDialog;
 window.confirmDetectedScan = confirmDetectedScan;
 window.editListItem = editListItem;
 window.deleteListItem = deleteListItem;
+window.changeItemCategory = changeItemCategory;
 window.changeStock = changeStock;
 window.addStockItemToList = addStockItemToList;
 window.deleteStock = deleteStock;
