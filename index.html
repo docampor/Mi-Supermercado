@@ -28,6 +28,7 @@
       <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 4.5 2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0Z"></path></symbol>
       <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M20 13 13 20 4 11V4h7l9 9Z"></path><path d="M7.5 7.5h.01"></path></symbol>
       <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></symbol>
+      <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></symbol>
       <symbol id="icon-apple" viewBox="0 0 24 24"><path d="M12 7c-3-3-8 0-7 6 1 6 5 8 7 6 2 2 6 0 7-6 1-6-4-9-7-6Z"></path><path d="M12 7c0-2 1-4 4-4"></path></symbol>
       <symbol id="icon-droplet" viewBox="0 0 24 24"><path d="M12 3s7 7 7 12a7 7 0 0 1-14 0c0-5 7-12 7-12Z"></path></symbol>
       <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Z"></path><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z"></path><path d="M5 15l.7 1.8L8 17.5l-2.3.7L5 20l-.7-1.8L2 17.5l2.3-.7L5 15Z"></path></symbol>
@@ -38,8 +39,8 @@
           <p class="eyebrow">Supermercado local</p>
           <h1>Control de Stock</h1>
         </div>
-        <button class="icon-button" id="installButton" hidden aria-label="Instalar app" title="Instalar app">
-          <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+        <button class="icon-button top-more" id="topMoreButton" type="button" aria-label="Mas opciones" title="Mas opciones">
+          <svg class="icon" aria-hidden="true"><use href="#icon-more"></use></svg>
         </button>
       </header>
 
@@ -264,9 +265,6 @@
           Stock PDF
         </button>
       </div>
-      <button class="more-button" id="moreButton" type="button" aria-label="Mas opciones" title="Mas opciones">
-        <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
-      </button>
     </div>
 
     <dialog id="productDialog">

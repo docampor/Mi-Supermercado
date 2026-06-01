@@ -23,7 +23,6 @@ let scannerQuantity = 1;
 const SCANNER_REQUIRED_READS = 3;
 const SCANNER_CONFIRMATION_WINDOW_MS = 1800;
 let stockAlertNotifiedKeys = new Set();
-let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
 
 const ARGENTINA_PRODUCT_CATALOG = {
@@ -251,7 +250,6 @@ let sepaDatasetReferencePromise = null;
 const $ = (selector) => document.querySelector(selector);
 
 const els = {
-  installButton: $("#installButton"),
   homeSummary: $("#homeSummary"),
   homeAlerts: $("#homeAlerts"),
   homeRecent: $("#homeRecent"),
@@ -294,7 +292,7 @@ const els = {
   scannerConfirmActions: $("#scannerConfirmActions"),
   manualBarcodeInput: $("#manualBarcodeInput"),
   moreMenu: $("#moreMenu"),
-  moreButton: $("#moreButton")
+  moreButton: $("#topMoreButton")
 };
 
 init();
@@ -365,19 +363,6 @@ function bindEvents() {
     $(`#${id}`).addEventListener("input", updateTotalPreview);
   });
 
-  window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    els.installButton.hidden = false;
-  });
-
-  els.installButton.addEventListener("click", async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    deferredInstallPrompt = null;
-    els.installButton.hidden = true;
-  });
 }
 
 function handleImageError(event) {

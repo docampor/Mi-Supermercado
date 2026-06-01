@@ -204,7 +204,8 @@ async function run() {
 
   const homeText = await page.locator("#view-home").innerText();
   const bottomNavCount = await page.locator(".bottom-nav .nav-button").count();
-  const moreButtonVisible = await page.locator("#moreButton").isVisible();
+  const moreButtonVisible = await page.locator("#topMoreButton").isVisible();
+  const oldFloatingMoreCount = await page.locator("#moreButton").count();
   await page.locator("#homeShopButton").click();
   await page.waitForFunction(() => document.querySelector("#view-shop")?.classList.contains("active"), null, { timeout: 5000 });
   await page.getByRole("button", { name: "Cargar manual" }).click();
@@ -334,7 +335,7 @@ async function run() {
   await page.waitForFunction(() => document.querySelector("#shoppingList")?.textContent.includes("Leche"), null, { timeout: 5000 });
   const restockListText = await page.locator("#shoppingList").innerText();
 
-  await page.locator("#moreButton").click();
+  await page.locator("#topMoreButton").click();
   await page.locator("#moreMenu button").filter({ hasText: "Informes" }).click();
   await page.waitForTimeout(300);
   await page.evaluate(() => {
@@ -402,7 +403,7 @@ async function run() {
   const checks = {
     appTitle: bodyText.includes("Control de Stock"),
     homeVisible: homeText.includes("Inicio") && homeText.includes("Ir de compras") && homeText.includes("Para mirar antes de salir"),
-    homeActionsWork: bottomNavCount === 4 && moreButtonVisible,
+    homeActionsWork: bottomNavCount === 4 && moreButtonVisible && oldFloatingMoreCount === 0,
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
     categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Limpieza") && stockText.includes("Lacteos"),
