@@ -234,6 +234,7 @@ const SEPA_DATASET_API = "https://datos.produccion.gob.ar/api/3/action/package_s
 const GO_UPC_READER_BASE = "https://r.jina.ai/";
 const GO_UPC_SEARCH_BASE = "https://go-upc.com/search?q=";
 const PRODUCT_CATEGORIES = [
+  "Alimentos",
   "Almacen",
   "Bebidas",
   "Lacteos",
@@ -936,20 +937,49 @@ function categoryOrder(category) {
 }
 
 function ensureCategoryOption(category) {
-  const cleanCategory = firstCategory(category) || "Otros";
-  return PRODUCT_CATEGORIES.includes(cleanCategory) ? cleanCategory : "Otros";
+  return firstCategory(category) || "Otros";
+}
+
+function categoryOptions(extraCategories = []) {
+  const options = new Set(PRODUCT_CATEGORIES);
+  const addCategory = (value) => {
+    const category = firstCategory(value);
+    if (category) options.add(category);
+  };
+
+  extraCategories.forEach(addCategory);
+  state.products.forEach((item) => {
+    addCategory(item.category);
+    addCategory(item.metadata?.category);
+  });
+  state.shoppingList.forEach((item) => {
+    addCategory(item.category);
+    addCategory(item.metadata?.category);
+  });
+  state.stock.forEach((item) => {
+    addCategory(item.category);
+    addCategory(item.metadata?.category);
+  });
+  state.purchases.forEach((purchase) => {
+    purchase.items?.forEach((item) => {
+      addCategory(item.category);
+      addCategory(item.metadata?.category);
+    });
+  });
+
+  return [...options].sort((a, b) => categoryOrder(a) - categoryOrder(b) || a.localeCompare(b, "es"));
 }
 
 function renderProductCategoryOptions(selectedCategory) {
   const selected = ensureCategoryOption(selectedCategory);
-  els.productCategoryInput.innerHTML = PRODUCT_CATEGORIES.map((category) => (
+  els.productCategoryInput.innerHTML = categoryOptions([selected]).map((category) => (
     `<option value="${escapeHtml(category)}"${category === selected ? " selected" : ""}>${escapeHtml(category)}</option>`
   )).join("");
 }
 
 function categoryControl(scope, item) {
   const selected = ensureCategoryOption(getItemCategory(item));
-  const options = PRODUCT_CATEGORIES.map((category) => (
+  const options = categoryOptions([selected]).map((category) => (
     `<option value="${escapeHtml(category)}"${category === selected ? " selected" : ""}>${escapeHtml(category)}</option>`
   )).join("");
 

@@ -400,6 +400,10 @@ async function run() {
     categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Limpieza") && stockText.includes("Lacteos"),
     categoryGroupsVisible: listCategoryGroups > 0 && stockCategoryGroups > 0,
     categoryChangeSaved: listActionText.includes("Limpieza") && !listActionText.includes("Almacen\n1 producto"),
+    categoryOptionsIncludeAlimentos: await page.evaluate(() => {
+      const select = document.querySelector(".category-select") || document.querySelector("#productCategoryInput");
+      return Array.from(select?.options || []).some((option) => option.value === "Alimentos");
+    }),
     listScanActionVisible: listActionText.includes("Escanear codigo") && listActionText.includes("Cargar sin escanear"),
     lowStockVisible: lowStockText.includes("Para reponer") && lowStockText.includes("Leche") && lowStockText.includes("Minimo"),
     restockListAdded: restockListText.includes("Leche") && restockListText.includes("Escanear codigo"),
