@@ -318,6 +318,10 @@ async function run() {
     appTitle: bodyText.includes("Control de Stock"),
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
+    scannerUsesRetailFormatsOnly: await page.evaluate(() => {
+      const source = window.openScanner.toString();
+      return source.includes("ean_13") && source.includes("upc_a") && !source.includes("code_128") && !source.includes("code_39");
+    }),
     lookupImageVisible: Boolean(lookupImageSrc),
     goUpcSourceVisible: lookupImageSrc.includes("go-upc"),
     fallbackImageVisible: Boolean(fallbackImageSrc),

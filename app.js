@@ -12,6 +12,9 @@ let pendingListItemId = null;
 let scannerCallback = null;
 let scannerStream = null;
 let scannerLoop = 0;
+let scannerCandidateCode = "";
+let scannerCandidateCount = 0;
+let scannerCandidateAt = 0;
 let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
 
@@ -1610,6 +1613,7 @@ function renderPurchaseHistoryCard(purchase) {
 async function openScanner(callback) {
   scannerCallback = callback;
   els.manualBarcodeInput.value = "";
+  resetScannerCandidate();
   els.scannerMessage.textContent = "Apunta al codigo de barras del producto.";
   els.scannerDialog.showModal();
 
@@ -1627,7 +1631,7 @@ async function openScanner(callback) {
     els.scannerVideo.srcObject = scannerStream;
     await els.scannerVideo.play();
     const detector = new BarcodeDetector({
-      formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"]
+      formats: ["ean_13", "ean_8", "upc_a", "upc_e"]
     });
     scanFrame(detector);
   } catch {
@@ -1641,8 +1645,15 @@ async function scanFrame(detector) {
   try {
     const codes = await detector.detect(els.scannerVideo);
     if (codes.length) {
-      finishScan(codes[0].rawValue);
-      return;
+      const code = normalizeBarcodeValue(codes[0].rawValue);
+      if (!isRetailBarcode(code)) {
+        els.scannerMessage.textContent = "Esa lectura no parece un codigo de supermercado. Ajusta el enfoque o cargalo manualmente.";
+      } else if (confirmScannerCandidate(code)) {
+        finishScan(code);
+        return;
+      } else {
+        els.scannerMessage.textContent = `Lei ${code}. Mantenelo quieto un segundo para confirmarlo.`;
+      }
     }
   } catch {
     els.scannerMessage.textContent = "Estoy intentando leer el codigo. Si no avanza, cargalo manualmente.";
@@ -1652,25 +1663,52 @@ async function scanFrame(detector) {
 
 function submitManualBarcode(event) {
   event.preventDefault();
-  const code = els.manualBarcodeInput.value.trim();
+  const code = normalizeBarcodeValue(els.manualBarcodeInput.value);
   if (code) finishScan(code);
 }
 
 function finishScan(code) {
   const callback = scannerCallback;
   closeScanner();
-  if (callback) callback(code);
+  if (callback) callback(normalizeBarcodeValue(code));
 }
 
 function closeScanner() {
   if (scannerLoop) cancelAnimationFrame(scannerLoop);
   scannerLoop = 0;
+  resetScannerCandidate();
   if (scannerStream) {
     scannerStream.getTracks().forEach((track) => track.stop());
     scannerStream = null;
   }
   els.scannerVideo.srcObject = null;
   if (els.scannerDialog.open) els.scannerDialog.close();
+}
+
+function normalizeBarcodeValue(code) {
+  return String(code || "").replace(/\D/g, "").trim();
+}
+
+function isRetailBarcode(code) {
+  return /^(\d{8}|\d{12,14})$/.test(code);
+}
+
+function confirmScannerCandidate(code) {
+  const now = Date.now();
+  if (code === scannerCandidateCode && now - scannerCandidateAt < 2200) {
+    scannerCandidateCount += 1;
+  } else {
+    scannerCandidateCode = code;
+    scannerCandidateCount = 1;
+  }
+  scannerCandidateAt = now;
+  return scannerCandidateCount >= 2;
+}
+
+function resetScannerCandidate() {
+  scannerCandidateCode = "";
+  scannerCandidateCount = 0;
+  scannerCandidateAt = 0;
 }
 
 function exportExcel() {
