@@ -824,6 +824,10 @@ video {
   gap: 8px;
 }
 
+.scanner-finish {
+  width: 100%;
+}
+
 .toast {
   position: fixed;
   right: 16px;

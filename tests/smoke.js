@@ -415,9 +415,15 @@ async function run() {
     scannerUsesRetailFormatsOnly: await page.evaluate(() => {
       const source = window.openScanner.toString();
       const confirmSource = window.confirmDetectedScan.toString();
+      window.resetScannerCandidate();
+      const firstRead = window.confirmScannerCandidate("7790520028655");
+      const secondRead = window.confirmScannerCandidate("7790520028655");
+      const thirdRead = window.confirmScannerCandidate("7790520028655");
       return source.includes("ean_13") && source.includes("upc_a") && !source.includes("code_128") && !source.includes("code_39") &&
         Boolean(document.querySelector("#scannerResult")) && Boolean(document.querySelector("#scannerQuantityBox")) &&
         Boolean(document.querySelector("#scannerConfirmActions")) &&
+        Boolean(document.querySelector("#finishScannerButton")) &&
+        firstRead === false && secondRead === false && thirdRead === true &&
         !confirmSource.includes("closeScanner()");
     }),
     lookupImageVisible: Boolean(lookupImageSrc),

@@ -20,6 +20,8 @@ let scannerConfirmedProduct = null;
 let scannerDetectingPaused = false;
 let scannerMode = "purchase";
 let scannerQuantity = 1;
+const SCANNER_REQUIRED_READS = 3;
+const SCANNER_CONFIRMATION_WINDOW_MS = 1800;
 let stockAlertNotifiedKeys = new Set();
 let deferredInstallPrompt = null;
 let barcodeLookupTimer = 0;
@@ -322,6 +324,7 @@ function bindEvents() {
   $("#clearDataButton").addEventListener("click", clearAllData);
   $("#manualBarcodeForm").addEventListener("submit", submitManualBarcode);
   $("#closeScannerButton").addEventListener("click", closeScanner);
+  $("#finishScannerButton").addEventListener("click", closeScanner);
   $("#confirmScanButton").addEventListener("click", confirmDetectedScan);
   $("#rejectScanButton").addEventListener("click", rejectDetectedScan);
   $("#decreaseScanQtyButton").addEventListener("click", () => changeScannerQuantity(-1));
@@ -2044,11 +2047,12 @@ async function scanFrame(detector) {
     if (codes.length) {
       const code = normalizeBarcodeValue(codes[0].rawValue);
       if (!isRetailBarcode(code)) {
+        resetScannerCandidate();
         els.scannerMessage.textContent = `Lei ${code}, pero no parece un EAN/UPC valido. Proba acercar o alejar un poco.`;
       } else if (confirmScannerCandidate(code)) {
         await previewDetectedScan(code);
       } else {
-        els.scannerMessage.textContent = `Lei ${code}. Mantenelo quieto para confirmar.`;
+        els.scannerMessage.textContent = `Lei ${code}. Verificando ${scannerCandidateCount}/${SCANNER_REQUIRED_READS}. Mantenelo quieto.`;
       }
     }
   } catch {
@@ -2183,14 +2187,14 @@ function hasValidBarcodeChecksum(code) {
 
 function confirmScannerCandidate(code) {
   const now = Date.now();
-  if (code === scannerCandidateCode && now - scannerCandidateAt < 2200) {
+  if (code === scannerCandidateCode && now - scannerCandidateAt < SCANNER_CONFIRMATION_WINDOW_MS) {
     scannerCandidateCount += 1;
   } else {
     scannerCandidateCode = code;
     scannerCandidateCount = 1;
   }
   scannerCandidateAt = now;
-  return scannerCandidateCount >= 1;
+  return scannerCandidateCount >= SCANNER_REQUIRED_READS;
 }
 
 function resetScannerCandidate() {
@@ -2236,13 +2240,15 @@ async function exportBackup() {
     exportedAt: new Date().toISOString(),
     data: cloneState(state)
   };
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+  const backupText = JSON.stringify(backup, null, 2);
+  const blob = new Blob([backupText], { type: "text/plain;charset=utf-8" });
   const filename = `control-stock-backup-${dateFileKey(new Date())}.json`;
   await shareFileOrDownload({
     blob,
     filename,
     title: "Backup Control de Stock",
     text: "Backup local de Control de Stock para importar en otro celular.",
+    fallbackText: backupText,
     sharedMessage: "Backup listo para compartir.",
     downloadedMessage: "Backup descargado para compartir."
   });
@@ -2315,9 +2321,10 @@ async function sharePdfReport({ title, filenamePrefix, emptyText, rows, columns 
   });
 }
 
-async function shareFileOrDownload({ blob, filename, title, text, sharedMessage, downloadedMessage }) {
+async function shareFileOrDownload({ blob, filename, title, text, fallbackText = "", sharedMessage, downloadedMessage }) {
   const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
-  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+  const canTryFileShare = navigator.share && (!navigator.canShare || canShareFiles(file) || fallbackText);
+  if (canTryFileShare) {
     try {
       await navigator.share({ title, text, files: [file] });
       toast(sharedMessage);
@@ -2327,8 +2334,29 @@ async function shareFileOrDownload({ blob, filename, title, text, sharedMessage,
     }
   }
 
+  if (fallbackText && navigator.share) {
+    try {
+      await navigator.share({
+        title,
+        text: `${text}\n\n${fallbackText}`
+      });
+      toast("Backup compartido como texto.");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+
   downloadBlob(blob, filename);
   toast(downloadedMessage);
+}
+
+function canShareFiles(file) {
+  try {
+    return navigator.canShare?.({ files: [file] }) === true;
+  } catch {
+    return false;
+  }
 }
 
 function createPdfReport({ title, rows, columns, emptyText }) {
@@ -2661,6 +2689,8 @@ window.scanForPurchase = scanForPurchase;
 window.sendListItemToPurchase = sendListItemToPurchase;
 window.closeProductDialog = closeProductDialog;
 window.confirmDetectedScan = confirmDetectedScan;
+window.confirmScannerCandidate = confirmScannerCandidate;
+window.resetScannerCandidate = resetScannerCandidate;
 window.editListItem = editListItem;
 window.deleteListItem = deleteListItem;
 window.changeItemCategory = changeItemCategory;
