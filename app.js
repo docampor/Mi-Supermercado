@@ -292,7 +292,9 @@ const els = {
   scannerQuantityBox: $("#scannerQuantityBox"),
   scannerQtyInput: $("#scannerQtyInput"),
   scannerConfirmActions: $("#scannerConfirmActions"),
-  manualBarcodeInput: $("#manualBarcodeInput")
+  manualBarcodeInput: $("#manualBarcodeInput"),
+  moreMenu: $("#moreMenu"),
+  moreButton: $("#moreButton")
 };
 
 init();
@@ -309,6 +311,12 @@ function bindEvents() {
   document.addEventListener("error", handleImageError, true);
   document.querySelectorAll(".nav-button").forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.view));
+  });
+  els.moreButton.addEventListener("click", toggleMoreMenu);
+  document.addEventListener("click", (event) => {
+    if (els.moreMenu.hidden) return;
+    if (els.moreMenu.contains(event.target) || els.moreButton.contains(event.target)) return;
+    els.moreMenu.hidden = true;
   });
 
   $("#newPurchaseButton").addEventListener("click", createNewPurchase);
@@ -361,18 +369,6 @@ function bindEvents() {
     event.preventDefault();
     deferredInstallPrompt = event;
     els.installButton.hidden = false;
-  });
-
-  $("#homeShopButton").addEventListener("click", () => showView("shop"));
-  $("#homeScanPurchaseButton").addEventListener("click", () => {
-    showView("shop");
-    scanForPurchase();
-  });
-  $("#homeStockButton").addEventListener("click", () => showView("stock"));
-  $("#homeListButton").addEventListener("click", () => showView("list"));
-  $("#homeScanStockButton").addEventListener("click", () => {
-    showView("stock");
-    scanForStock();
   });
 
   els.installButton.addEventListener("click", async () => {
@@ -440,11 +436,27 @@ function render() {
 }
 
 function showView(viewName) {
+  els.moreMenu.hidden = true;
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   document.querySelector(`#view-${viewName}`).classList.add("active");
   document.querySelectorAll(".nav-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === viewName);
   });
+}
+
+function toggleMoreMenu(event) {
+  event?.stopPropagation();
+  els.moreMenu.hidden = !els.moreMenu.hidden;
+}
+
+function startHomePurchaseScan() {
+  showView("shop");
+  if (!els.scannerDialog.open) scanForPurchase();
+}
+
+function startHomeStockScan() {
+  showView("stock");
+  if (!els.scannerDialog.open) scanForStock();
 }
 
 function renderHome() {
@@ -2811,6 +2823,9 @@ function escapeHtml(value) {
 
 window.editPurchaseItem = editPurchaseItem;
 window.removePurchaseItem = removePurchaseItem;
+window.showView = showView;
+window.startHomePurchaseScan = startHomePurchaseScan;
+window.startHomeStockScan = startHomeStockScan;
 window.scanForPurchase = scanForPurchase;
 window.sendListItemToPurchase = sendListItemToPurchase;
 window.closeProductDialog = closeProductDialog;
@@ -2823,4 +2838,6 @@ window.changeItemCategory = changeItemCategory;
 window.changeStock = changeStock;
 window.addStockItemToList = addStockItemToList;
 window.deleteStock = deleteStock;
+window.shareShoppingListReport = shareShoppingListReport;
+window.shareStockReport = shareStockReport;
 window.fillProductFromBarcode = fillProductFromBarcode;

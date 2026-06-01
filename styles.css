@@ -612,7 +612,7 @@ select:focus {
   left: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   width: min(100%, 760px);
   margin: 0 auto;
@@ -633,6 +633,53 @@ select:focus {
   border-radius: 8px;
   font-size: 0.7rem;
   font-weight: 800;
+}
+
+.more-button {
+  position: fixed;
+  right: max(18px, calc((100vw - 760px) / 2 + 18px));
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  z-index: 25;
+  width: 58px;
+  height: 58px;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 14px 28px rgba(90, 37, 22, 0.28);
+}
+
+.more-button .icon {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.more-menu {
+  position: fixed;
+  right: max(16px, calc((100vw - 760px) / 2 + 16px));
+  bottom: calc(154px + env(safe-area-inset-bottom));
+  z-index: 26;
+  display: grid;
+  gap: 8px;
+  width: min(220px, calc(100vw - 32px));
+  padding: 10px;
+  background: rgba(255, 254, 250, 0.98);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.more-menu[hidden] {
+  display: none;
+}
+
+.more-menu button {
+  justify-content: flex-start;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--primary);
+  background: #e8f2ee;
+  border-radius: 8px;
+  font-weight: 900;
 }
 
 .nav-button .icon {

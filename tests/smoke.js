@@ -203,7 +203,10 @@ async function run() {
   await page.reload({ waitUntil: "networkidle" });
 
   const homeText = await page.locator("#view-home").innerText();
-  await page.getByRole("button", { name: "Compra", exact: true }).click();
+  const bottomNavCount = await page.locator(".bottom-nav .nav-button").count();
+  const moreButtonVisible = await page.locator("#moreButton").isVisible();
+  await page.locator("#homeShopButton").click();
+  await page.waitForFunction(() => document.querySelector("#view-shop")?.classList.contains("active"), null, { timeout: 5000 });
   await page.getByRole("button", { name: "Cargar manual" }).click();
   await page.locator("#barcodeInput").fill(testBarcode);
   await page.evaluate(() => window.fillProductFromBarcode(true));
@@ -331,7 +334,8 @@ async function run() {
   await page.waitForFunction(() => document.querySelector("#shoppingList")?.textContent.includes("Leche"), null, { timeout: 5000 });
   const restockListText = await page.locator("#shoppingList").innerText();
 
-  await page.getByRole("button", { name: "Informes" }).click();
+  await page.locator("#moreButton").click();
+  await page.locator("#moreMenu button").filter({ hasText: "Informes" }).click();
   await page.waitForTimeout(300);
   await page.evaluate(() => {
     Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
@@ -398,6 +402,7 @@ async function run() {
   const checks = {
     appTitle: bodyText.includes("Control de Stock"),
     homeVisible: homeText.includes("Inicio") && homeText.includes("Ir de compras") && homeText.includes("Para mirar antes de salir"),
+    homeActionsWork: bottomNavCount === 4 && moreButtonVisible,
     reportsVisible: bodyText.includes("Informes") && bodyText.includes("Compras del mes"),
     purchaseSaved: bodyText.includes("Salsa lista"),
     categoriesVisible: purchaseItemText.includes("Almacen") && listActionText.includes("Limpieza") && stockText.includes("Lacteos"),

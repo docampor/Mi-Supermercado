@@ -55,19 +55,19 @@
           <div class="summary-grid home-summary" id="homeSummary"></div>
 
           <div class="home-actions">
-            <button class="primary wide" id="homeShopButton" type="button">
+            <button class="primary wide" id="homeShopButton" type="button" onclick="showView('shop')">
               <svg class="icon" aria-hidden="true"><use href="#icon-cart"></use></svg>
               Ir de compras
             </button>
-            <button class="secondary wide" id="homeScanPurchaseButton" type="button">
+            <button class="secondary wide" id="homeScanPurchaseButton" type="button" onclick="startHomePurchaseScan()">
               <svg class="icon" aria-hidden="true"><use href="#icon-scan"></use></svg>
               Escanear compra
             </button>
-            <button class="secondary wide" id="homeStockButton" type="button">
+            <button class="secondary wide" id="homeStockButton" type="button" onclick="showView('stock')">
               <svg class="icon" aria-hidden="true"><use href="#icon-box"></use></svg>
               Ver stock
             </button>
-            <button class="secondary wide" id="homeListButton" type="button">
+            <button class="secondary wide" id="homeListButton" type="button" onclick="showView('list')">
               <svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
               Ver lista
             </button>
@@ -76,7 +76,7 @@
           <div class="panel">
             <div class="panel-title">
               <h3>Para mirar antes de salir</h3>
-              <button class="primary small" id="homeScanStockButton" type="button">
+              <button class="primary small" id="homeScanStockButton" type="button" onclick="startHomeStockScan()">
                 <svg class="icon" aria-hidden="true"><use href="#icon-scan"></use></svg>
                 Escanear stock
               </button>
@@ -249,11 +249,24 @@
           <svg class="icon" aria-hidden="true"><use href="#icon-box"></use></svg>
           Stock
         </button>
-        <button class="nav-button" data-view="reports">
+      </nav>
+      <div class="more-menu" id="moreMenu" hidden>
+        <button type="button" onclick="showView('reports')">
           <svg class="icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
           Informes
         </button>
-      </nav>
+        <button type="button" onclick="shareShoppingListReport()">
+          <svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
+          Lista PDF
+        </button>
+        <button type="button" onclick="shareStockReport()">
+          <svg class="icon" aria-hidden="true"><use href="#icon-box"></use></svg>
+          Stock PDF
+        </button>
+      </div>
+      <button class="more-button" id="moreButton" type="button" aria-label="Mas opciones" title="Mas opciones">
+        <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+      </button>
     </div>
 
     <dialog id="productDialog">
